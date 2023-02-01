@@ -13,6 +13,7 @@ import           Data.Array.IArray
 import           FRP.BearRiver
 import qualified Graphics.Gloss as GLO
 import qualified Graphics.Gloss.Interface.IO.Animate as GLOAnim
+import           Data.MonadicStreamFunction.InternalCore
 
 data SIRState = Susceptible | Infected | Recovered deriving (Show, Eq)
 
@@ -296,7 +297,7 @@ susceptibleAgent _coord
           s <- drawRandomElemS -< ns
           case s of
             Infected -> do
-              infected <- arrM_ (lift $ randomBoolM infectivity) -< ()
+              infected <- arrM (const (lift $ randomBoolM infectivity)) -< ()
               if infected 
                 then returnA -< (Infected, Event ())
                 else returnA -< (Susceptible, NoEvent)
