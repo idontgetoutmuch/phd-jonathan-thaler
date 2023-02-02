@@ -8,7 +8,7 @@ import           Text.Printf
 
 import           Control.Monad.Random
 import           Control.Monad.Reader
-import           Control.Monad.Trans.MSF.Random
+import           Control.Monad.Trans.MSF.Random -- from Dunai
 import           Data.Array.IArray
 import           FRP.BearRiver
 import qualified Graphics.Gloss as GLO
@@ -55,7 +55,7 @@ main :: IO ()
 main = do
   hSetBuffering stdout NoBuffering
 
-  let visualise = False
+  let visualise = True
       t         = 100
       dt        = 0.1
       seed      = 123 -- 123 -- 42 leads to recovery without any infection
