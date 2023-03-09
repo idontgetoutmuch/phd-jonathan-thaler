@@ -4,19 +4,24 @@
 
 An agent-based model (ABM) is a computational model which uses a bottom-up approach to simulate the actions and interactions of the system's constituent units (agents) to capture the global system behaviour. The autonomous agents are assigned characteristics (e.g. age) and follow various rules to ensure viable system dynamics. Spatiality can also be added to simulations.
 
-Traditionally, ABM simulations are implemented as object-oriented programs due to the intuitive mapping of objects to agents. However, Functional Reactive Programming can also be used to guarantee the reproducibility of the simulation at compile time and avoid specific run-time bugs - which cannot be achieved in traditional object-oriented languages such as C#.
-
+Traditionally, ABM simulations are implemented as object-oriented programs due to the intuitive mapping of objects to agents. However, Functional Reactive Programming can also be used as it can guarantee the reproducibility of the simulation at compile time and avoid specific run-time bugs - which cannot be achieved in traditional object-oriented languages such as C#. 
 
 ## What is Functional Reactive Programming?
 
-In pure functional programming there are no side effects – which are often required for applications such as user-interaction or ABM. As a result, functional reactive programming (FRP) is used as it provides a way to implement systems with continuous and discrete time-semantics in pure functional languages.
+Functional reactive programming (FRP) provides a method of implementing systems with continuous and discrete time-semantics in pure functional languages. FRP
+successfully applied in many domains, such as robotics or user interfacing. 
 
-In this case, FRP is implemented using an arrowised FRP approach. The central concept of the arrowised FRP is the Signal Function (SF). The SF represents a process overtime which maps an input signal to an output signal. A signal is a value which varies overtime. Thus, signifying that SFs have an awareness of the passing of time through the timestep of the system. This concept is essential for ABM due to actions of agents or events in simulation being time dependent.
+The central abstraction in FRP is a signal - which is a value that varies overtime. These signals can be composed directly or by composing signal functions. FRP libaries generally use arrows to implement functionality rather than monads due to greater efficiency and modularity. Arrows are a superset of monads, hence have very similar uses but are more restrictive (see [here](https://pdf.sciencedirectassets.com/272990/1-s2.0-S1571066106X02438/1-s2.0-S1571066106001666/main.pdf?X-Amz-Security-Token=IQoJb3JpZ2luX2VjEJ7%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJGMEQCIFDg9QZeU9kXNykNtK1Y3q77oHuug09p5ti63It1vccTAiBFKp5vMEkDr9v8O6lU%2FGJEBt1WPAktubolt%2FM7Ft0eRyqzBQhXEAUaDDA1OTAwMzU0Njg2NSIMm1WFiIp%2BgTN43MxSKpAF4WtU%2BhIjuCHa7o1OJ%2FJ5MHrwqLRo%2BnhAJ7pK%2BeBHF6xEGRXFSUKaELPIEgO6CAoqLitoqxUvWasKIWiBouge9w%2FZhcoQKARlX6lw6dYnQktYC%2BzakAwobpJa1s2LEWugYNdL9j2bfEZZJ3AtIqbUlwtvbBhqAEyKxkEQHlolc9cHyaq17Vv6%2FgfPDeE%2BqM6cM5I025Q4nQcAK4cQMzb66%2BxiIVpcAGVR8gSprc7GfKIpQlVO17l7aPJ33%2FDrrNMG28QydoXVKseJN2bkGk6%2BnjlP0TItMeFC5r%2FEtx%2BpgYTS%2BpnS%2FPxWeCDUMq4HfTNB9qVMipypeP98oeGMR92%2BNjp2uhF9X2a%2BHJbdOOQVV3IxKsT5JjSJ%2FzJhp6ieJ%2BPM7%2BCSIsCQ7Udf%2FaDo0KeX6KsGtCNFh0zJFwNyel6sx1b5yPXG8t7rgC2KAGV1kaYpggNZKMoGHFDt0HUOQCIan0hiP9vW8GvX0HjI1%2FH3Kajx0qVKnbky%2FbNfGmj9gMCJBfxYpRNvO0as%2FtWBngW7QQHIQR2opY400yJxE%2BdVFCgfCDaYBuDl1sckh7O%2FbDKT%2FQtEHmRlUdYkg8BIHYsqC%2FE3nt5Sqo83JGpaL7%2F0R0TyioO8EazXMwWVDK%2B%2Fbn4AhmoxIEPuAhw%2FgkfAUtn9o7a3iZF%2BHT%2Fv6gGxKLJkI40OzkM3nTlHmd93Yceamm%2Bj%2BHUcMzkqyUxyVUGQLEuTFWJ8DrFGsLqE%2F0h9A4y1sGV48%2BYXiiRipqitUyx7fW%2F1JRuY8sPsJmLc4CnIihYXIhIhzm06xqmouOaOEuSlAFvnAuvy6f09mD8VCC8H2E%2BtqkmUciVlg4fVM3mMRHdePbtNJ8HxyaN6143%2BMD8GVVkwzdqloAY6sgFkA1yE%2BQykIX6iO2s8d%2Bsr4dc1A4L23Kw4TymTEusts%2BVxCXWhF2CU23C3MxIddMHinkuiv8u6J6tcehBM05NTGXotQgTLeL4IASQ6%2BNdj6YWRjHZ5A77E8qBMap%2FWzGzpDXLAJ4hDZWktDQ4KMpW446reCDlw0ViRPJTzaSPsCcuElkjGI34WpARqHLN149%2FSs%2FcIFWBqwhG0%2F93p3zgWt5gkv9u5lbg6ZOYZ1Bjgzm9z&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20230309T062929Z&X-Amz-SignedHeaders=host&X-Amz-Expires=300&X-Amz-Credential=ASIAQ3PHCVTY3TG3MPND%2F20230309%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=ae795e67238960dc7bcdc97d21a32e3c73d229d94f6ccf87eecdd2eb4cb17ccb&hash=6109688cb98c98a108b74ea3b2556b59fcada4fd8ea4d0942973369e63ce2e0e&host=68042c943591013ac2b2430a89b270f6af2c76d8dfd086a07176afe7c76c2c61&pii=S1571066106001666&tid=spdf-0f923ac0-927a-479a-84e6-8376df53a474&sid=749e13d39ace604f5e2bba26f52d6131b5ccgxrqa&type=client&tsoh=d3d3LnNjaWVuY2VkaXJlY3QuY29t&ua=04125300565756535e54&rr=7a514386fa4faafb&cc=au) for more on arrows vs monads).
+
+The central concept of arrowised FRP is the Signal Function (SF). The SF represents a process overtime which maps an input signal to an output signal. Thus, signifying that SFs have an awareness of the passing of time through the timestep of the system. This concept of using time-varying functions as a method of handling agent-based models is essential due to their time-dependent nature (see more [here](https://www.cs.yale.edu/publications/techreports/tr1049.pdf)).
+
+
+Futher reading on FRP concepts https://ivanperez.io/papers/2016-HaskellSymposium-Perez-Barenz-Nilsson-FRPRefactored-short.pdf
 
 
 ## SIR model using Functional Reactive Programming
 
-The goal is to use a Functional Reactive Programming (FRP) approach in Haskell to simulate a SIR (Susceptible, Infected, Recovered) model - which is a simple compartmental model. The general trend within such a SIR model is as below:
+The goal is to use a Functional Reactive Programming (FRP) approach in Haskell to simulate a SIR (Susceptible, Infected, Recovered) model - which is a simple compartmental model. The general result within such a SIR model is as below:
 ![Screen%20Shot%202023-02-15%20at%203.49.56%20pm.png](attachment:Screen%20Shot%202023-02-15%20at%203.49.56%20pm.png)
 
 The following sections describe the approach taken to achieve the above trend using a FRP approach in Haskell.
@@ -25,17 +30,15 @@ The following sections describe the approach taken to achieve the above trend us
 
 #### Language Extensions
 Language extensions are used to enable certain features in Haskell. In this case, we require the following features:
-- Arrows : to support the arrow notations
-- Strict : to allows functions parameters to be evaluated before calls
-- FlexibleContexts : to allow any types inside a typeClass
+- `Arrows` : to support the arrow notations
+- `Strict` : to allows functions parameters to be evaluated before calls
+- `FlexibleContexts` : loosens restrictions on what constraints can be used in a typeclass
 
 
 ```haskell
--- Language Extensions
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE FlexibleContexts #-}
---{-# LANGUAGE OverloadedStrings #-}
 ```
 
 #### Loading Modules
@@ -43,8 +46,6 @@ Various modules required for the different aspect of simulation must be loaded.
 
 
 ```haskell
---module Main where
--- importing modules required for the simulation
 import           Data.IORef
 import           System.IO
 import           Text.Printf
@@ -57,9 +58,6 @@ import           FRP.BearRiver
 import qualified Graphics.Gloss as GLO
 import qualified Graphics.Gloss.Interface.IO.Animate as GLOAnim
 import           Data.MonadicStreamFunction.InternalCore
---import Prelude hiding (filter, lookup, repeat)
---import qualified Graphics.Vega.VegaLite as VL
---import Graphics.Vega.VegaLite
 ```
 
 #### SIR States as a Algebraic Data type
@@ -69,29 +67,26 @@ Additionally, a deriving (Show, Eq) clause is used to ensure the complier automa
 
 
 ```haskell
--- Define the SIR states as ADT 
 data SIRState = Susceptible | Infected | Recovered deriving (Show, Eq)
 ```
 
 #### Define 2D environment
-In this model, a A x A grid is used to define the spatial aspect of the model. Here, the discrete 2D environment is defined with a tuple.
+In this model, a N x A grid is used to define the spatial aspect of the model. Here, the discrete 2D environment is defined with a tuple.
 
 
 ```haskell
--- define a discrete 2D enviroment with a tuple 
 type Disc2dCoord  = (Int, Int)
 ```
 
 #### Define types to store agent's environment
-During the simulation, the location and state of each agent must be retrievable. Hence, the type SIREnv is defined to allow agents to store their location coordinate and their state in an array.
+During the simulation, the location and state of each agent must be retrievable. Hence, the type `SIREnv` is defined to allow agents to store their location coordinate and their state in an array.
 
 
 ```haskell
--- Array to store agent location and state
 type SIREnv       = Array Disc2dCoord SIRState
 ```
 
-Next, a type SIRMonad is defined to prevent the use of excessive RandomGen arguments. 
+Next, to aid readability, we define a type synonym for `Rand` monad which allows us to obtain random numbers parameterised over the random number generator `g`
 
 
 ```haskell
@@ -99,20 +94,18 @@ type SIRMonad g   = Rand g
 ```
 
 #### Define the SIR Agent
-SIRAgent is used to define Agents as Signal functions which receives the SIR states of all agents as input and outputs the current SIR state of the agent. It also returns the output in a SIRMonad context - which is building the monad over a rand monad.
+`SIRAgent` is used to define Agents as Signal functions which receives the SIR states of all agents as input and outputs the current SIR state of the agent. It also returns the output in a `SIRMonad` context - which is building the monad over a rand monad.
 
 
 ```haskell
--- returns the output in a SIRMonad context
 type SIRAgent g   = SF (SIRMonad g) SIREnv SIRState
 ```
 
-SimSF type is similar to SIRagent above, however it does not receive any inputs and just outputs the current location and state of the agent. This is useful in instances where states of neighbours must be accessed by an agent to determine whether infection occurs. 
+`SimSF` type is similar to `SIRagent` above, however it does not receive any inputs and just outputs the current location and state of the agent. This is useful in instances where states of neighbours must be accessed by an agent to determine whether infection occurs. 
 
 
 
 ```haskell
--- outputs the environment of the SIR simulation
 type SimSF g = SF (SIRMonad g) () SIREnv
 ```
 
@@ -121,7 +114,6 @@ A simulation context data struct which contains the various parameters (e.g. sim
 
 
 ```haskell
--- data for the simulation (context data struct)
 data SimCtx g = SimCtx 
   { simSf    :: !(SimSF g)
   , simEnv   :: !SIREnv
@@ -185,11 +177,10 @@ To ensure ease of understanding and seperation of functionality, various helper 
 
 ##### Functions related to the simulation context
 
-mkSimCtx and runStepCtx are used to initalise the simulation context and update the simulation context respectively.
+`mkSimCtx` and `runStepCtx` are used to initalise the simulation context and update the simulation context respectively.
 
 
 ```haskell
--- Makes the simulation context (a specific data type) via various input parameters
 mkSimCtx :: RandomGen g
          => SimSF g
          -> SIREnv
@@ -206,7 +197,6 @@ mkSimCtx sf env g steps t = SimCtx {
   , simTime  = t
   }
 
--- Runs the simulation context (???)
 runStepCtx :: RandomGen g
            => DTime
            -> SimCtx g
@@ -266,15 +256,13 @@ bottomRightDelta  = ( 1,  1)
 
 ##### Functions related to using RNG elements
 
-drawRandomElemS and randomBoolM are related to use of RNG elements in simulation. A specific example is RandomBoolM being used to draw a random Boolean to determine whether an infection occurs in the susceptibleAgent function.
+`drawRandomElemS` and `randomBoolM` are related to use of RNG elements in simulation. A specific example is `RandomBoolM` being used to draw a random Boolean to determine whether an infection occurs in the susceptibleAgent function.
 
 
 ```haskell
--- allows to keep track of the changed random num generator internally
 randomBoolM :: RandomGen g => Double -> Rand g Bool
 randomBoolM p = getRandomR (0, 1) >>= (\r -> return $ r <= p)
 
--- similar to randomBool but takes input and returns a random elem from it
 drawRandomElemS :: MonadRandom m => SF m [a] a
 drawRandomElemS = proc as -> do
   r <- getRandomRS ((0, 1) :: (Double, Double)) -< ()
@@ -288,11 +276,10 @@ drawRandomElemS = proc as -> do
 
 Aspects related to the behaviour of agents are defined via the various functions below.
 
-initAgentsEnv initialises the simulation environment.
+`initAgentsEnv` initialises the simulation environment.
 
 
 ```haskell
--- initialises the simulation environment
 initAgentsEnv :: (Int, Int) -> ([(Disc2dCoord, SIRState)], SIREnv)
 initAgentsEnv (xd, yd) = (as, e)
   where
@@ -311,7 +298,7 @@ initAgentsEnv (xd, yd) = (as, e)
     e = array ((0, 0), (xd - 1, yd - 1)) as
 ```
 
-In order to observe the general SIR trend, infection via observing the neighbours must be viable. The neighbours function takes the coordinates and returns the surround SIRstates. allNeighbours returns the state of all neighbours or agents.
+In order to observe the general SIR trend, infection via observing the neighbours must be viable. The neighbours function takes the coordinates and returns the surround SIRstates. `allNeighbours` returns the state of all neighbours or agents.
 
 
 ```haskell
@@ -338,7 +325,6 @@ Unlike the other states, the recovered state does not generate any event and rat
 
 
 ```haskell
--- constant state is recovered 
 recoveredAgent :: RandomGen g => SIRAgent g
 recoveredAgent = arr (const Recovered) 
 ```
@@ -347,8 +333,6 @@ The function below describes the behaviour of an infected agent. This behaviour 
 
 
 ```haskell
--- infected agent recovers on average after delta time units
--- infected agent ignores state of the other agents
 infectedAgent :: RandomGen g => SIRAgent g
 infectedAgent
     = switch
@@ -367,11 +351,10 @@ infectedAgent
         else returnA -< (Infected, NoEvent)
 ```
 
-susceptibleAgent describes the behaviour of a susceptible agent - which is governed by querying the surrounding neighbours and either getting infected based on the parameter γ (event generated) or staying susceptible (no event)
+`susceptibleAgent` describes the behaviour of a susceptible agent - which is governed by querying the surrounding neighbours and either getting infected based on the parameter γ (event generated) or staying susceptible (no event)
 
 
 ```haskell
--- behaviour of susceptible agent
 susceptibleAgent :: RandomGen g => Disc2dCoord -> SIRAgent g
 susceptibleAgent _coord
     = switch 
@@ -405,11 +388,10 @@ susceptibleAgent _coord
             _       -> returnA -< (Susceptible, NoEvent))
 ```
 
-sirAgent defines the behaviour of the agent depending on the initial state. Only the suspectible agent receives the coordinates as the infected and recovered agents do not require this information.
+`sirAgent` defines the behaviour of the agent depending on the initial state. Only the suspectible agent receives the coordinates as the infected and recovered agents do not require this information.
 
 
 ```haskell
--- defines agent behaviour based on their initial state
 sirAgent :: RandomGen g => Disc2dCoord -> SIRState -> SIRAgent g
 sirAgent coord Susceptible = susceptibleAgent coord
 sirAgent _     Infected    = infectedAgent
@@ -448,11 +430,10 @@ simulationStep sfsCoords env = MSF $ \_ -> do
 
 To generate the MATLAB script and animation, various functions that collate the data are required.
 
-aggregateStates is used to collate the number of susceptible, infected and recovered agents within the simulation. This function is used both for the animation and the plot (later).
+`aggregateStates` is used to collate the number of susceptible, infected and recovered agents within the simulation. This function is used both for the animation and the plot (later).
 
 
 ```haskell
--- get counts of states
 aggregateStates :: [SIRState] -> (Double, Double, Double)
 aggregateStates as = (susceptibleCount, infectedCount, recoveredCount)
   where
@@ -461,11 +442,10 @@ aggregateStates as = (susceptibleCount, infectedCount, recoveredCount)
     recoveredCount = fromIntegral $ length $ filter (Recovered==) as
 ```
 
-siraggregateStates collates the susceptibleCount, infectedCount, recoveredCount information as strings.
+`siraggregateStates` collates the susceptibleCount, infectedCount, recoveredCount information as strings.
 
 
 ```haskell
--- get counts into strings
 sirAggregateToString :: (Double, Double, Double) -> String
 sirAggregateToString (susceptibleCount, infectedCount, recoveredCount) =
   printf "%f" susceptibleCount
@@ -476,11 +456,10 @@ sirAggregateToString (susceptibleCount, infectedCount, recoveredCount) =
 
 ##### Functions related to generating the MATLAB output
 
-Another output of this simulation is a MATLAB file which can be run to generate a graph of the SIR populations overtime. The functions writeAggregatesToFile, writeMatlabPlot and sirAggregateToString are related to generating the content of this file.
+Another output of this simulation is a MATLAB file which can be run to generate a graph of the SIR populations overtime. The functions `writeAggregatesToFile`, `writeMatlabPlot` and `sirAggregateToString` are related to generating the content of this file.
 
 
 ```haskell
--- Write simulation results into MATLAB file 
 writeAggregatesToFile :: String 
                       -> DTime
                       -> [(Double, Double, Double)] 
@@ -495,7 +474,6 @@ writeAggregatesToFile fileName dt dynamics = do
 
   hClose fileHdl
 
--- Write contents of MATLAB file
 writeMatlabPlot :: Handle 
                 -> DTime
                 -> IO ()
@@ -537,12 +515,10 @@ sirAggregateToString (susceptibleCount, infectedCount, recoveredCount) =
 
 ##### Functions for generating  MATLAB file
 
-writeSimulationUntil uses the above auxilliary functions to generate the overall MATLAB file
+`writeSimulationUntil` uses the above auxilliary functions to generate the overall MATLAB file
 
 
 ```haskell
--- Function gets the states of S,I,R and write the results 
---to a MATLAB file
 writeSimulationUntil :: RandomGen g
                      => Time
                      -> DTime
@@ -580,11 +556,10 @@ writeSimulationUntil tMax dt ctx0 fileName = do
 
 ##### Functions for generating the animation
 
-visualiseSimulation generates and updates the animation.
+`visualiseSimulation` generates and updates the animation.
 
 
 ```haskell
--- creates the animation output 
 visualiseSimulation :: RandomGen g
                     => DTime
                     -> SimCtx g
@@ -593,6 +568,7 @@ visualiseSimulation dt ctx0 = do
     ctxRef <- newIORef ctx0
 
     GLOAnim.animateIO
+    
       (GLO.InWindow winTitle winSize (0, 0))
       GLO.white
       (nextFrame ctxRef)
@@ -659,11 +635,10 @@ visualiseSimulation dt ctx0 = do
 
 ##### Functions for running simulation
 
-runSimulationUntil runs the overall simulation for the desired duration.
+`runSimulationUntil` runs the overall simulation for the desired duration.
 
 
 ```haskell
--- Function that runs the simulation 
 runSimulationUntil :: RandomGen g
                    => Time
                    -> DTime
@@ -694,11 +669,10 @@ runSimulationUntil tMax dt ctx0 = runSimulationAux 0 ctx0 []
 
 ## Main Function
 
-The main function below sets up the general simulation via various steps and enables a method of getting output either through a animation or through a MATLAB file output.
+The `main` function below sets up the general simulation via various steps and enables a method of getting output either through a animation or through a MATLAB file output.
 
 
 ```haskell
--- main function which governs the type of output from simulation.
 main :: IO ()
 main = do
   hSetBuffering stdout NoBuffering
@@ -727,86 +701,103 @@ main = do
 
 ```
 
-# Results
+# Results -- **csv file read into list not working yet*
 
 To be finalised with charts.
 
-# ** VEGA CHARTS NOT WORKING **
 
-links I used:
-https://hackage.haskell.org/package/hvega-0.12.0.3/docs/Graphics-Vega-VegaLite.html
-https://github.com/DougBurke/hvega
+```haskell
+{-# LANGUAGE ScopedTypeVariables #-}
+
+import qualified Data.ByteString.Lazy as BL
+import Data.Csv
+import qualified Data.Vector as V
+        
+-- My attempt at storing CSV file contents to lists           
+getResults :: IO()
+getResults = do
+    let list = [1]
+    inputCSVData list
+    
+inputCSVData :: [Int] -> IO()
+inputCSVData xs = do
+    csvData <- BL.readFile "myFile.csv"
+    case decode NoHeader csvData of
+        Left err -> putStrLn err
+        Right v -> V.forM_ v $ \ (susceptible :: Int,infected :: Int, recovered :: Int) ->
+        --want to save the columns of the csv file as lists so it can be plotted
+        -- currently, just tried to store susceptible count 
+            inputCSVData (susceptible:xs)
+            print (init xs)   
+getResults
+
+```
+
+
+    <interactive>:13:13: error:
+        • Couldn't match expected type: (a0 -> IO ()) -> [Int] -> IO b0
+                      with actual type: IO ()
+        • The function ‘inputCSVData’ is applied to three value arguments, but its type ‘[Int] -> IO ()’ has only one
+          In the expression: inputCSVData (susceptible : xs) print (init xs)
+          In the second argument of ‘($)’, namely ‘\ (susceptible :: Int, infected :: Int, recovered :: Int) -> inputCSVData (susceptible : xs) print (init xs)’
 
 
 
 ```haskell
---{-# LANGUAGE OverloadedStrings #-}
---import Prelude hiding (filter, lookup, repeat)
---import qualified Graphics.Vega.VegaLite as VL
---import Graphics.Vega.VegaLite
+-- merge :: [a] -> [a] -> [a]
+-- merge xs     []     = xs
+-- merge []     ys     = ys
+-- merge (x:xs) (y:ys) = x : y : merge xs ys
 
-
--- If you are viewing this in an IHaskell notebook rather than Jupyter Lab,
--- use the following to see the visualizations
-vlShow = id
-
-
-lineChartPointMarkers =
-    let label = description "Stock prices of 5 Tech Companies over Time."
-        dvals = dataFromUrl "https://github.com/DougBurke/hvega/blob/main/notebooks/data/stocks.csv" []
+-- Code to print results - works fine 
+-- printResults :: IO ()
+-- printResults = do
+--     let list = ["1"]
+--     csvData <- BL.readFile "myFile.csv"
+--     case decode NoHeader csvData of
+--         Left err -> putStrLn err
+--         Right v -> V.forM_ v $ \ (susceptible :: Int,infected :: Int, recovered :: Int) ->
+--             putStrLn $  show susceptible ++ " S " ++ show infected ++ " I"
     
-        markOpts = mark Line [MPoint (PMMarker [])]
-        
-        enc = encoding
-                . position X [PName "date", PTimeUnit (TU Day)]
-                . position Y [PName "price", PmType Quantitative, PAggregate Mean]
-                . color [MName "symbol", MmType Nominal]
-                
-    in toVegaLite [label, dvals, markOpts, enc []]
-    
-vlShow lineChartPointMarkers
 ```
 
 
-    <interactive>:13:8: error: Variable not in scope: toVegaLite :: [a6] -> t
-    <interactive>:11:49: error:
-        • Data constructor not in scope: Nominal
-        • Perhaps you meant one of these: ‘IHaskellTH.NominalR’ (imported from Language.Haskell.TH), variable ‘IHaskellTH.nominalR’ (imported from Language.Haskell.TH)
-    <interactive>:11:42: error:
-        • Data constructor not in scope: MmType :: t0 -> a0
-        • Perhaps you meant variable ‘IHaskellTH.unType’ (imported from Language.Haskell.TH)
-    <interactive>:11:26: error: Data constructor not in scope: MName :: String -> a0
-    <interactive>:11:19: error:
-        • Variable not in scope: color :: [a0] -> a -> b0
-        • Perhaps you meant one of these: ‘GLO.color’ (imported from Graphics.Gloss), data constructor ‘GLO.Color’ (imported from Graphics.Gloss)
-    <interactive>:10:78: error: Data constructor not in scope: Mean
-    <interactive>:10:67: error: Data constructor not in scope: PAggregate :: t1 -> a1
-    <interactive>:10:53: error: Data constructor not in scope: Quantitative
-    <interactive>:10:46: error:
-        • Data constructor not in scope: PmType :: t2 -> a1
-        • Perhaps you meant variable ‘IHaskellTH.unType’ (imported from Language.Haskell.TH)
-    <interactive>:10:31: error: Data constructor not in scope: PName :: String -> a1
-    <interactive>:10:28: error: Data constructor not in scope: Y
-    <interactive>:10:19: error: Variable not in scope: position :: t3 -> [a1] -> b0 -> b1
-    <interactive>:9:59: error: Data constructor not in scope: Day
-    <interactive>:9:56: error: Data constructor not in scope: TU :: t4 -> t5
-    <interactive>:9:45: error: Data constructor not in scope: PTimeUnit :: t5 -> a2
-    <interactive>:9:31: error: Data constructor not in scope: PName :: String -> a2
-    <interactive>:9:28: error: Data constructor not in scope: X
-    <interactive>:9:19: error: Variable not in scope: position :: t6 -> [a2] -> b1 -> b2
-    <interactive>:8:15: error: Variable not in scope: encoding :: b2 -> c
-    <interactive>:6:39: error: Data constructor not in scope: PMMarker :: [a3] -> t7
-    <interactive>:6:31: error:
-        • Data constructor not in scope: MPoint :: t7 -> a4
-        • Perhaps you meant variable ‘hPrint’ (imported from System.IO)
-    <interactive>:6:25: error:
-        • Data constructor not in scope: Line
-        • Perhaps you meant one of these: ‘GLO.Line’ (imported from Graphics.Gloss), ‘IHaskellTH.LineP’ (imported from Language.Haskell.TH), variable ‘GLO.line’ (imported from Graphics.Gloss)
-    <interactive>:6:20: error:
-        • Variable not in scope: mark :: t8 -> [a4] -> t9
-        • Perhaps you meant ‘GLO.dark’ (imported from Graphics.Gloss)
-    <interactive>:4:17: error: Variable not in scope: dataFromUrl :: String -> [a5] -> t9
-    <interactive>:3:17: error: Variable not in scope: description :: String -> t9
+```haskell
+import Plots.Axis  (Axis, r2Axis)
+import Plots.Axis.ColourBar (colourBar)
+import Plots.Axis.Render (renderAxis, r2AxisMain)
+import Plots.Axis.Scale (axisExtend, noExtend)
+import Plots.Style (axisColourMap, magma, greys)
+import Plots.Types (display)
+import Plots.Types.HeatMap
+
+import Control.Lens ((&~), (.=))
+import Diagrams.Backend.Cairo (B, Cairo)
+import Diagrams.TwoD.Types (V2)
+import Diagrams.Core.Types (QDiagram)
+import IHaskell.Display.Diagrams
+import IHaskell.Display.Juicypixels hiding (display)
+import Plots
+
+-- want data in this format for each S,I,R state for plotting 
+mydata1 = [(1,3), (2,5.5), (3.2, 6), (3.5, 6.1)]
+mydata2 = [(1,3), (2,5.5), (3.2, 6), (3.5, 6.1)]
+mydata3 = [(1,4), (2,5.6), (3.5, 6), (3.5, 10)]
+--
+scatterAxis :: Axis B V2 Double
+scatterAxis = r2Axis &~ do
+    scatterPlot mydata1 $ key "S"
+    scatterPlot mydata2 $ key "I"
+    scatterPlot mydata3 $ key "R"
+--
+scatterExample = renderAxis scatterAxis
+diagram scatterExample
+```
+
+
+    
+![svg](output_84_0.svg)
+    
 
 
 
