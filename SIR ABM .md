@@ -58,6 +58,26 @@ import           FRP.BearRiver
 import qualified Graphics.Gloss as GLO
 import qualified Graphics.Gloss.Interface.IO.Animate as GLOAnim
 import           Data.MonadicStreamFunction.InternalCore
+import           Data.List (unfoldr)
+import           Graphics.Gloss.Export
+
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Csv             as Csv
+import Plots.Axis  (Axis, r2Axis)
+import Plots.Axis.Render (renderAxis, r2AxisMain)
+import Plots.Types (display)
+
+import Control.Lens ((&~), (.=))
+import Diagrams.Backend.Cairo (B, Cairo)
+import Diagrams.TwoD.Types (V2)
+import Diagrams.Core.Types (QDiagram)
+import IHaskell.Display.Diagrams
+import IHaskell.Display.Juicypixels hiding (display)
+import Plots (scatterPlot, key)
+
+import qualified Data.ByteString.Lazy as BL
+import Data.Csv
+import qualified Data.Vector as V
 ```
 
 #### SIR States as a Algebraic Data type
@@ -158,7 +178,7 @@ agentGridSize :: (Int, Int)
 agentGridSize = (51, 51)
 ```
 
-The outputs of the simulation will be a MATLAB file and an animation, hence parameters relevant to these are set.
+The outputs of the simulation will be a CSV file containing the data and an animation, hence parameters relevant to these are set.
 
 
 ```haskell
@@ -166,10 +186,106 @@ The outputs of the simulation will be a MATLAB file and an animation, hence para
 winSize :: (Int, Int)
 winSize = (800, 800)
 
+-- parameters for gif
+cx, cy, wx, wy :: Int
+(cx, cy)   = agentGridSize
+(wx, wy)   = winSize
+
+-- parameters for rendering agents 
+cellWidth, cellHeight :: Double
+cellWidth  = (fromIntegral wx / fromIntegral cx)
+cellHeight = (fromIntegral wy / fromIntegral cy)
+
+
 -- window title for animation
 winTitle :: String
 winTitle = "Agent-Based SIR on 2D Grid"
 ```
+
+
+<style>/* Styles used for the Hoogle display in the pager */
+.hoogle-doc {
+display: block;
+padding-bottom: 1.3em;
+padding-left: 0.4em;
+}
+.hoogle-code {
+display: block;
+font-family: monospace;
+white-space: pre;
+}
+.hoogle-text {
+display: block;
+}
+.hoogle-name {
+color: green;
+font-weight: bold;
+}
+.hoogle-head {
+font-weight: bold;
+}
+.hoogle-sub {
+display: block;
+margin-left: 0.4em;
+}
+.hoogle-package {
+font-weight: bold;
+font-style: italic;
+}
+.hoogle-module {
+font-weight: bold;
+}
+.hoogle-class {
+font-weight: bold;
+}
+.get-type {
+color: green;
+font-weight: bold;
+font-family: monospace;
+display: block;
+white-space: pre-wrap;
+}
+.show-type {
+color: green;
+font-weight: bold;
+font-family: monospace;
+margin-left: 1em;
+}
+.mono {
+font-family: monospace;
+display: block;
+}
+.err-msg {
+color: red;
+font-style: italic;
+font-family: monospace;
+white-space: pre;
+display: block;
+}
+#unshowable {
+color: red;
+font-weight: bold;
+}
+.err-msg.in.collapse {
+padding-top: 0.7em;
+}
+.highlight-code {
+white-space: pre;
+font-family: monospace;
+}
+.suggestion-warning { 
+font-weight: bold;
+color: rgb(200, 130, 0);
+}
+.suggestion-error { 
+font-weight: bold;
+color: red;
+}
+.suggestion-name {
+font-weight: bold;
+}
+</style><div class="suggestion-name" style="clear:both;">Redundant bracket</div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Found:</div><div class="highlight-code" id="haskell">(fromIntegral wx / fromIntegral cx)</div></div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Why Not:</div><div class="highlight-code" id="haskell">fromIntegral wx / fromIntegral cx</div></div><div class="suggestion-name" style="clear:both;">Redundant bracket</div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Found:</div><div class="highlight-code" id="haskell">(fromIntegral wy / fromIntegral cy)</div></div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Why Not:</div><div class="highlight-code" id="haskell">fromIntegral wy / fromIntegral cy</div></div>
+
 
 #### Defining helper functions for the simulation
 
@@ -213,6 +329,17 @@ runStepCtx dt ctx = ctx'
     steps = simSteps ctx + 1
     t     = simTime ctx + dt
     ctx'  = mkSimCtx simSf' env g' steps t
+```
+
+` evaluateCtxs ` takes the initial context and creates a list of new contexts by running the simulation step.
+
+
+```haskell
+evaluateCtxs :: RandomGen g => Int -> DTime -> SimCtx g -> [SimCtx g]
+evaluateCtxs n dt initCtx = unfoldr g (initCtx, n)
+  where
+    g (c, m) | m < 0 = Nothing
+                   | otherwise = Just (c, (runStepCtx dt c, m - 1))
 ```
 
 ##### Functions related to Boundary Conditions
@@ -267,8 +394,8 @@ drawRandomElemS :: MonadRandom m => SF m [a] a
 drawRandomElemS = proc as -> do
   r <- getRandomRS ((0, 1) :: (Double, Double)) -< ()
   let len = length as
-  let idx = fromIntegral len * r
-  let a =  as !! floor idx
+  let idx = (fromIntegral len * r)
+  let a =  as !! (floor idx)
   returnA -< a
 ```
 
@@ -302,24 +429,108 @@ In order to observe the general SIR trend, infection via observing the neighbour
 
 
 ```haskell
--- function not actually used
---neighbours :: SIREnv 
-           -- -> Disc2dCoord 
-           -- -> Disc2dCoord
-           -- -> [Disc2dCoord] 
-           -- -> [SIRState]
--- neighbours e (x, y) (dx, dy) n = map (e !) nCoords'
-  -- where
-    -- nCoords  = map (\(x', y') -> (x + x', y + y')) n
-    -- nCoords' = filter (\(nx, ny) -> nx >= 0 && 
-                                    -- ny >= 0 && 
-                                    -- nx <= (dx - 1) &&
-                                  -- ny <= (dy - 1)) nCoords
+neighbours :: SIREnv 
+           -> Disc2dCoord 
+           -> Disc2dCoord
+           -> [Disc2dCoord] 
+           -> [SIRState]
+neighbours e (x, y) (dx, dy) n = map (e !) nCoords'
+  where
+    nCoords  = map (\(x', y') -> (x + x', y + y')) n
+    nCoords' = filter (\(nx, ny) -> nx >= 0 && 
+                                    ny >= 0 && 
+                                    nx <= (dx - 1) &&
+                                  ny <= (dy - 1)) nCoords
                                   
--- returns state of all neighbours or all agents 
+ 
 allNeighbours :: SIREnv -> [SIRState]
 allNeighbours = elems
 ```
+
+
+<style>/* Styles used for the Hoogle display in the pager */
+.hoogle-doc {
+display: block;
+padding-bottom: 1.3em;
+padding-left: 0.4em;
+}
+.hoogle-code {
+display: block;
+font-family: monospace;
+white-space: pre;
+}
+.hoogle-text {
+display: block;
+}
+.hoogle-name {
+color: green;
+font-weight: bold;
+}
+.hoogle-head {
+font-weight: bold;
+}
+.hoogle-sub {
+display: block;
+margin-left: 0.4em;
+}
+.hoogle-package {
+font-weight: bold;
+font-style: italic;
+}
+.hoogle-module {
+font-weight: bold;
+}
+.hoogle-class {
+font-weight: bold;
+}
+.get-type {
+color: green;
+font-weight: bold;
+font-family: monospace;
+display: block;
+white-space: pre-wrap;
+}
+.show-type {
+color: green;
+font-weight: bold;
+font-family: monospace;
+margin-left: 1em;
+}
+.mono {
+font-family: monospace;
+display: block;
+}
+.err-msg {
+color: red;
+font-style: italic;
+font-family: monospace;
+white-space: pre;
+display: block;
+}
+#unshowable {
+color: red;
+font-weight: bold;
+}
+.err-msg.in.collapse {
+padding-top: 0.7em;
+}
+.highlight-code {
+white-space: pre;
+font-family: monospace;
+}
+.suggestion-warning { 
+font-weight: bold;
+color: rgb(200, 130, 0);
+}
+.suggestion-error { 
+font-weight: bold;
+color: red;
+}
+.suggestion-name {
+font-weight: bold;
+}
+</style><div class="suggestion-name" style="clear:both;">Use bimap</div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Found:</div><div class="highlight-code" id="haskell">\ (x', y') -> (x + x', y + y')</div></div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Why Not:</div><div class="highlight-code" id="haskell">Data.Bifunctor.bimap ((+) x) ((+) y)</div></div>
+
 
 Unlike the other states, the recovered state does not generate any event and rather just acts a sink which constantly returns Recovered.
 
@@ -428,9 +639,7 @@ simulationStep sfsCoords env = MSF $ \_ -> do
 
 ##### Functions related to collating simulation data
 
-To generate the MATLAB script and animation, various functions that collate the data are required.
-
-`aggregateStates` is used to collate the number of susceptible, infected and recovered agents within the simulation. This function is used both for the animation and the plot (later).
+`aggregateStates` is used to collate the number of susceptible, infected and recovered agents within the simulation. This function is used both for the animation and the plot.
 
 
 ```haskell
@@ -442,80 +651,17 @@ aggregateStates as = (susceptibleCount, infectedCount, recoveredCount)
     recoveredCount = fromIntegral $ length $ filter (Recovered==) as
 ```
 
-`siraggregateStates` collates the susceptibleCount, infectedCount, recoveredCount information as strings.
+##### Functions for generating  CSV file
+
+`appendLine` is a helper function used to write the counts of the S, I, R states into the CSV file.
 
 
 ```haskell
-sirAggregateToString :: (Double, Double, Double) -> String
-sirAggregateToString (susceptibleCount, infectedCount, recoveredCount) =
-  printf "%f" susceptibleCount
-  ++ "," ++ printf "%f" infectedCount
-  ++ "," ++ printf "%f" recoveredCount
-  ++ ";"
+appendLine :: Csv.ToRecord a => Handle -> a -> IO ()
+appendLine hndl line = LBS.hPut hndl (Csv.encode [Csv.toRecord line])
 ```
 
-##### Functions related to generating the MATLAB output
-
-Another output of this simulation is a MATLAB file which can be run to generate a graph of the SIR populations overtime. The functions `writeAggregatesToFile`, `writeMatlabPlot` and `sirAggregateToString` are related to generating the content of this file.
-
-
-```haskell
-writeAggregatesToFile :: String 
-                      -> DTime
-                      -> [(Double, Double, Double)] 
-                      -> IO ()
-writeAggregatesToFile fileName dt dynamics = do
-  fileHdl <- openFile fileName WriteMode
-  hPutStrLn fileHdl "dynamics = ["
-  mapM_ (hPutStrLn fileHdl . sirAggregateToString) dynamics
-  hPutStrLn fileHdl "];"
-
-  writeMatlabPlot fileHdl dt
-
-  hClose fileHdl
-
-writeMatlabPlot :: Handle 
-                -> DTime
-                -> IO ()
-writeMatlabPlot fileHdl dt = do
-  hPutStrLn fileHdl "susceptible = dynamics (:, 1);"
-  hPutStrLn fileHdl "infected = dynamics (:, 2);"
-  hPutStrLn fileHdl "recovered = dynamics (:, 3);"
-  hPutStrLn fileHdl "totalPopulation = susceptible(1) + infected(1) + recovered(1);"
-
-  hPutStrLn fileHdl "susceptibleRatio = susceptible ./ totalPopulation;"
-  hPutStrLn fileHdl "infectedRatio = infected ./ totalPopulation;"
-  hPutStrLn fileHdl "recoveredRatio = recovered ./ totalPopulation;"
-
-  hPutStrLn fileHdl "steps = length (susceptible);"
-  hPutStrLn fileHdl "indices = 0 : steps - 1;"
-  hPutStrLn fileHdl $ "indices = indices ./ " ++ show (1 / dt) ++ ";"
-
-  hPutStrLn fileHdl "figure"
-  hPutStrLn fileHdl "plot (indices, susceptibleRatio.', 'color', 'blue', 'linewidth', 2);"
-  hPutStrLn fileHdl "hold on"
-  hPutStrLn fileHdl "plot (indices, infectedRatio.', 'color', 'red', 'linewidth', 2);"
-  hPutStrLn fileHdl "hold on"
-  hPutStrLn fileHdl "plot (indices, recoveredRatio.', 'color', 'green', 'linewidth', 2);"
-
-  hPutStrLn fileHdl "set(gca,'YTick',0:0.05:1.0);"
-  
-  hPutStrLn fileHdl "xlabel ('Time');"
-  hPutStrLn fileHdl "ylabel ('Population Ratio');"
-  hPutStrLn fileHdl "legend('Susceptible','Infected', 'Recovered');"
-
--- get counts into strings
-sirAggregateToString :: (Double, Double, Double) -> String
-sirAggregateToString (susceptibleCount, infectedCount, recoveredCount) =
-  printf "%f" susceptibleCount
-  ++ "," ++ printf "%f" infectedCount
-  ++ "," ++ printf "%f" recoveredCount
-  ++ ";"
-```
-
-##### Functions for generating  MATLAB file
-
-`writeSimulationUntil` uses the above auxilliary functions to generate the overall MATLAB file
+`writeSimulationUntil` uses the above auxilliary functions to generate the overall CSV file
 
 
 ```haskell
@@ -527,12 +673,8 @@ writeSimulationUntil :: RandomGen g
                      -> IO ()
 writeSimulationUntil tMax dt ctx0 fileName = do
     fileHdl <- openFile fileName WriteMode
-    hPutStrLn fileHdl "dynamics = ["
+    appendLine fileHdl ("Susceptible", "Infected", "Recovered")
     writeSimulationUntilAux 0 ctx0 fileHdl
-    hPutStrLn fileHdl "];"
-
-    writeMatlabPlot fileHdl dt 
-
     hClose fileHdl
   where
     writeSimulationUntilAux :: RandomGen g
@@ -540,16 +682,16 @@ writeSimulationUntil tMax dt ctx0 fileName = do
                             -> SimCtx g
                             -> Handle
                             -> IO ()
-    writeSimulationUntilAux t ctx fileHdl 
+    writeSimulationUntilAux t ctx fileHdl
         | t >= tMax = return ()
         | otherwise = do
           let env  = simEnv ctx
               aggr = aggregateStates $ elems env
-  
+
               t'   = t + dt
               ctx' = runStepCtx dt ctx
 
-          hPutStrLn fileHdl (sirAggregateToString aggr)
+          appendLine fileHdl aggr
 
           writeSimulationUntilAux t' ctx' fileHdl
 ```
@@ -592,10 +734,10 @@ visualiseSimulation dt ctx0 = do
 
       return $ ctxToPic ctx
 
-    ctxToPic :: RandomGen g
+ctxToPic :: RandomGen g
              => SimCtx g 
              -> GLO.Picture
-    ctxToPic ctx = GLO.Pictures $ aps ++ [timeStepTxt]
+ctxToPic ctx = GLO.Pictures $ aps ++ [timeStepTxt]
       where
           env = simEnv ctx
           as  = assocs env
@@ -606,22 +748,22 @@ visualiseSimulation dt ctx0 = do
           timeTxt     = printf "%0.1f" t
           timeStepTxt = GLO.color GLO.black $ GLO.translate tcx tcy $ GLO.scale 0.5 0.5 $ GLO.Text timeTxt
 
-    renderAgent :: (Disc2dCoord, SIRState) -> GLO.Picture
-    renderAgent (coord, Susceptible) 
-        = GLO.color (GLO.makeColor 0.0 0.0 0.7 1.0) $ GLO.translate x y $ GLO.Circle (realToFrac cellWidth / 2)
-      where
-        (x, y) = transformToWindow coord
-    renderAgent (coord, Infected)    
-        = GLO.color (GLO.makeColor 0.7 0.0 0.0 1.0) $ GLO.translate x y $ GLO.ThickCircle 0 (realToFrac cellWidth)
-      where
-        (x, y) = transformToWindow coord
-    renderAgent (coord, Recovered)   
-        = GLO.color (GLO.makeColor 0.0 0.70 0.0 1.0) $ GLO.translate x y $ GLO.ThickCircle 0 (realToFrac cellWidth)
-      where
-        (x, y) = transformToWindow coord
+renderAgent :: (Disc2dCoord, SIRState) -> GLO.Picture
+renderAgent (coord, Susceptible)
+    = GLO.color (GLO.makeColor 0.0 0.0 0.7 1.0) $ GLO.translate x y $ GLO.Circle (realToFrac cellWidth / 2)
+  where
+    (x, y) = transformToWindow coord
+renderAgent (coord, Infected)
+    = GLO.color (GLO.makeColor 0.7 0.0 0.0 1.0) $ GLO.translate x y $ GLO.ThickCircle 0 (realToFrac cellWidth)
+  where
+    (x, y) = transformToWindow coord
+renderAgent (coord, Recovered)
+    = GLO.color (GLO.makeColor 0.0 0.70 0.0 1.0) $ GLO.translate x y $ GLO.ThickCircle 0 (realToFrac cellWidth)
+  where
+    (x, y) = transformToWindow coord
 
-    transformToWindow :: Disc2dCoord -> (Float, Float)
-    transformToWindow (x, y) = (x', y')
+transformToWindow :: Disc2dCoord -> (Float, Float)
+transformToWindow (x, y) = (x', y')
       where
         rw = cellWidth
         rh = cellHeight
@@ -631,6 +773,15 @@ visualiseSimulation dt ctx0 = do
 
         x' = fromRational (toRational (fromIntegral x * rw)) - halfXSize
         y' = fromRational (toRational (fromIntegral y * rh)) - halfYSize
+```
+
+`animation` is used to map a list of contexts to time - which is required for the function that produces the gif.
+
+
+```haskell
+animation :: RandomGen g => [SimCtx g] -> DTime -> Time -> SimCtx g
+-- bc of the gif time to pictures conversion. Lists of context -> time to context 
+animation ctxs dt t = ctxs !! floor (t / dt)
 ```
 
 ##### Functions for running simulation
@@ -662,145 +813,165 @@ runSimulationUntil tMax dt ctx0 = runSimulationAux 0 ctx0 []
         t'   = t + dt -- increase time by timestep
         ctx' = runStepCtx dt ctx -- get new step context
         acc' = aggr : acc
-        
-        
-
 ```
 
 ## Main Function
 
-The `main` function below sets up the general simulation via various steps and enables a method of getting output either through a animation or through a MATLAB file output.
+The `main` function below sets up the general simulation via various steps and enables a method of getting output either through an animation or through a CSV file output and a GIF of the animation.
 
 
 ```haskell
 main :: IO ()
 main = do
   hSetBuffering stdout NoBuffering
-  -- enabling the visualisation/animation 
-  let visualise = True
-      t         = 100 -- simulation duration 
-      dt        = 0.1 -- time step of simulation 
-      seed      = 123 -- seed for RNG -- 42 leads to recovery without any infection
-      
-      g         = mkStdGen seed -- takes the seed and creates the RNG
-      (as, env) = initAgentsEnv agentGridSize -- initalises the environment based on grid size
-      sfs       = map (\(coord, a) -> (sirAgent coord a, coord)) as -- mapping agents to coordinates
-      sf        = simulationStep sfs env -- processsing the simualtion with agents and environment
-      ctx       = mkSimCtx sf env g 0 0 -- creates the simulation context via various inputs 
 
--- if animation is enabled
+  let visualise = False
+      t         = 100
+      dt        = 0.1
+      seed      = 123 -- 42 leads to recovery without any infection
+
+      g         = mkStdGen seed
+      (as, env) = initAgentsEnv agentGridSize
+      sfs       = map (\(coord, a) -> (sirAgent coord a, coord)) as
+      sf        = simulationStep sfs env
+      ctx       = mkSimCtx sf env g 0 0
+
   if visualise
-  -- then create the animation window and update it
     then visualiseSimulation dt ctx
     else do
-    -- else write the results into a MATLAB file
-      --let ret = runSimulationUntil t dt ctx
-      --writeAggregatesToFile "SIR_DUNAI.m" ret 
-      writeSimulationUntil t dt ctx "SIR_DUNAI_dt001.m"-- we will change to a chart in haskell or csv 
-
-
+      let ts = [0.0, dt .. t]
+      let ctxs = evaluateCtxs (length ts) dt ctx
+      exportPicturesToGif 10 LoopingForever (800, 800) GLO.white "SIR.gif" ((ctxToPic . (animation ctxs dt)) . uncurry encodeFloat . decodeFloat) (map (uncurry encodeFloat . decodeFloat) ts)
+      writeSimulationUntil t dt ctx "SIR_DUNAI_dt001.csv"
 ```
 
-# Results -- **csv file read into list not working yet*
 
-To be finalised with charts.
+<style>/* Styles used for the Hoogle display in the pager */
+.hoogle-doc {
+display: block;
+padding-bottom: 1.3em;
+padding-left: 0.4em;
+}
+.hoogle-code {
+display: block;
+font-family: monospace;
+white-space: pre;
+}
+.hoogle-text {
+display: block;
+}
+.hoogle-name {
+color: green;
+font-weight: bold;
+}
+.hoogle-head {
+font-weight: bold;
+}
+.hoogle-sub {
+display: block;
+margin-left: 0.4em;
+}
+.hoogle-package {
+font-weight: bold;
+font-style: italic;
+}
+.hoogle-module {
+font-weight: bold;
+}
+.hoogle-class {
+font-weight: bold;
+}
+.get-type {
+color: green;
+font-weight: bold;
+font-family: monospace;
+display: block;
+white-space: pre-wrap;
+}
+.show-type {
+color: green;
+font-weight: bold;
+font-family: monospace;
+margin-left: 1em;
+}
+.mono {
+font-family: monospace;
+display: block;
+}
+.err-msg {
+color: red;
+font-style: italic;
+font-family: monospace;
+white-space: pre;
+display: block;
+}
+#unshowable {
+color: red;
+font-weight: bold;
+}
+.err-msg.in.collapse {
+padding-top: 0.7em;
+}
+.highlight-code {
+white-space: pre;
+font-family: monospace;
+}
+.suggestion-warning { 
+font-weight: bold;
+color: rgb(200, 130, 0);
+}
+.suggestion-error { 
+font-weight: bold;
+color: red;
+}
+.suggestion-name {
+font-weight: bold;
+}
+</style><div class="suggestion-name" style="clear:both;">Redundant bracket</div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Found:</div><div class="highlight-code" id="haskell">ctxToPic . (animation ctxs dt)</div></div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Why Not:</div><div class="highlight-code" id="haskell">ctxToPic . animation ctxs dt</div></div>
+
+
+# Results 
+
+Chart to be finalised. Further details on the results to be added after this.
 
 
 ```haskell
-{-# LANGUAGE ScopedTypeVariables #-}
+decodeCSV :: BL.ByteString -> Either String (V.Vector (Int, Int, Int))
+decodeCSV  = decode NoHeader  
 
-import qualified Data.ByteString.Lazy as BL
-import Data.Csv
-import qualified Data.Vector as V
-        
--- My attempt at storing CSV file contents to lists           
-getResults :: IO()
+getResults :: IO ([(Int, Int)], [(Int, Int)], [(Int, Int)])
 getResults = do
-    let list = [1]
-    inputCSVData list
-    
-inputCSVData :: [Int] -> IO()
-inputCSVData xs = do
     csvData <- BL.readFile "myFile.csv"
+    let x = decodeCSV csvData
     case decode NoHeader csvData of
-        Left err -> putStrLn err
-        Right v -> V.forM_ v $ \ (susceptible :: Int,infected :: Int, recovered :: Int) ->
-        --want to save the columns of the csv file as lists so it can be plotted
-        -- currently, just tried to store susceptible count 
-            inputCSVData (susceptible:xs)
-            print (init xs)   
-getResults
+        Left err -> error err
+        Right y -> do let (a,b,c) = addToList y
+                      let d = zip [1..length a] a --data that I want to use for plotting (trace 1 - S)
+                      let e = zip [1..length b] b --data for plotting (line 2)
+                      let f = zip [1..length c] c --data for plotting (line 3)
+                      pure (d, e, f)
 
-```
+addToList :: V.Vector (Int, Int, Int) -> ([Int], [Int], [Int])
+addToList v = unzip3 (V.toList v)
 
+(d,e,f) <- getResults
 
-    <interactive>:13:13: error:
-        • Couldn't match expected type: (a0 -> IO ()) -> [Int] -> IO b0
-                      with actual type: IO ()
-        • The function ‘inputCSVData’ is applied to three value arguments, but its type ‘[Int] -> IO ()’ has only one
-          In the expression: inputCSVData (susceptible : xs) print (init xs)
-          In the second argument of ‘($)’, namely ‘\ (susceptible :: Int, infected :: Int, recovered :: Int) -> inputCSVData (susceptible : xs) print (init xs)’
-
-
-
-```haskell
--- merge :: [a] -> [a] -> [a]
--- merge xs     []     = xs
--- merge []     ys     = ys
--- merge (x:xs) (y:ys) = x : y : merge xs ys
-
--- Code to print results - works fine 
--- printResults :: IO ()
--- printResults = do
---     let list = ["1"]
---     csvData <- BL.readFile "myFile.csv"
---     case decode NoHeader csvData of
---         Left err -> putStrLn err
---         Right v -> V.forM_ v $ \ (susceptible :: Int,infected :: Int, recovered :: Int) ->
---             putStrLn $  show susceptible ++ " S " ++ show infected ++ " I"
-    
-```
-
-
-```haskell
-import Plots.Axis  (Axis, r2Axis)
-import Plots.Axis.ColourBar (colourBar)
-import Plots.Axis.Render (renderAxis, r2AxisMain)
-import Plots.Axis.Scale (axisExtend, noExtend)
-import Plots.Style (axisColourMap, magma, greys)
-import Plots.Types (display)
-import Plots.Types.HeatMap
-
-import Control.Lens ((&~), (.=))
-import Diagrams.Backend.Cairo (B, Cairo)
-import Diagrams.TwoD.Types (V2)
-import Diagrams.Core.Types (QDiagram)
-import IHaskell.Display.Diagrams
-import IHaskell.Display.Juicypixels hiding (display)
-import Plots
-
--- want data in this format for each S,I,R state for plotting 
-mydata1 = [(1,3), (2,5.5), (3.2, 6), (3.5, 6.1)]
-mydata2 = [(1,3), (2,5.5), (3.2, 6), (3.5, 6.1)]
-mydata3 = [(1,4), (2,5.6), (3.5, 6), (3.5, 10)]
+scatterAxis2 :: Axis B V2 Double
+scatterAxis2 = r2Axis &~ do
+    scatterPlot (map (\(x,y) -> (fromIntegral x, fromIntegral y)) d) $ key "S"
+    scatterPlot (map (\(x,y) -> (fromIntegral x, fromIntegral y)) e) $ key "I"
+    scatterPlot (map (\(x,y) -> (fromIntegral x, fromIntegral y)) f) $ key "R"
 --
-scatterAxis :: Axis B V2 Double
-scatterAxis = r2Axis &~ do
-    scatterPlot mydata1 $ key "S"
-    scatterPlot mydata2 $ key "I"
-    scatterPlot mydata3 $ key "R"
---
-scatterExample = renderAxis scatterAxis
-diagram scatterExample
+scatterExample2 = renderAxis scatterAxis2
+diagram scatterExample2
 ```
 
 
     
-![svg](output_84_0.svg)
+![svg](output_82_0.svg)
     
 
 
+The GIF below shows the spread of infection overtime
 
-```haskell
-
-```
+![SegmentLocal](SIR.gif "segment")
