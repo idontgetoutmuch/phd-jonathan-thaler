@@ -198,7 +198,7 @@ which allows us to obtain random numbers parameterised over the random
 number generator `g`
 
 \begin{code}
-type SIRMonad g   = Rand g 
+type SIRMonad g   = Rand g
 \end{code}
 
 Define the SIR Agent
@@ -228,7 +228,7 @@ A simulation context data struct which contains the various parameters
 to specific it is a strictness declaration.
 
 \begin{code}
-data SimCtx g = SimCtx 
+data SimCtx g = SimCtx
   { simSf    :: !(SimSF g)
   , simEnv   :: !SIREnv
   , simRng   :: g
@@ -258,7 +258,7 @@ To enforce the simulation rules, various simulation parameters are
 defined.
 
 \begin{code}
--- contact rate or β 
+-- contact rate or β
 contactRate :: Double
 contactRate = 5.0
 
@@ -279,7 +279,7 @@ The outputs of the simulation will be a CSV file containing the data and
 an animation, hence parameters relevant to these are set.
 
 \begin{code}
--- window size for animation 
+-- window size for animation
 winSize :: (Int, Int)
 winSize = (800, 800)
 
@@ -288,7 +288,7 @@ cx, cy, wx, wy :: Int
 (cx, cy)   = agentGridSize
 (wx, wy)   = winSize
 
--- parameters for rendering agents 
+-- parameters for rendering agents
 cellWidth, cellHeight :: Double
 cellWidth  = (fromIntegral wx / fromIntegral cx)
 cellHeight = (fromIntegral wy / fromIntegral cy)
@@ -429,15 +429,15 @@ initAgentsEnv (xd, yd) = (as, e)
     xCenter = floor $ fromIntegral xd * (0.5 :: Double)
     yCenter = floor $ fromIntegral yd * (0.5 :: Double)
     -- populating the grid with susceptible agents everywhere except the centre
-    sus = [ ((x, y), Susceptible) | x <- [0..xd-1], 
+    sus = [ ((x, y), Susceptible) | x <- [0..xd-1],
                                     y <- [0..yd-1],
                                     x /= xCenter ||
-                                    y /= yCenter ] 
-    -- populating the infected agent at the center                             
+                                    y /= yCenter ]
+    -- populating the infected agent at the center
     inf = ((xCenter, yCenter), Infected)
     -- list of infected and susceptible agent locations
     as = inf : sus
-    -- array of min and max grid size and the list of agent locations 
+    -- array of min and max grid size and the list of agent locations
     e = array ((0, 0), (xd - 1, yd - 1)) as
 \end{code}
 
@@ -447,20 +447,20 @@ and returns the surround SIRstates. `allNeighbours` returns the state of
 all neighbours or agents.
 
 \begin{code}
-neighbours :: SIREnv 
-           -> Disc2dCoord 
+neighbours :: SIREnv
            -> Disc2dCoord
-           -> [Disc2dCoord] 
+           -> Disc2dCoord
+           -> [Disc2dCoord]
            -> [SIRState]
 neighbours e (x, y) (dx, dy) n = map (e !) nCoords'
   where
     nCoords  = map (\(x', y') -> (x + x', y + y')) n
-    nCoords' = filter (\(nx, ny) -> nx >= 0 && 
-                                    ny >= 0 && 
+    nCoords' = filter (\(nx, ny) -> nx >= 0 &&
+                                    ny >= 0 &&
                                     nx <= (dx - 1) &&
                                   ny <= (dy - 1)) nCoords
-                                  
- 
+
+
 allNeighbours :: SIREnv -> [SIRState]
 allNeighbours = elems
 \end{code}
@@ -470,7 +470,7 @@ and rather just acts a sink which constantly returns Recovered.
 
 \begin{code}
 recoveredAgent :: RandomGen g => SIRAgent g
-recoveredAgent = arr (const Recovered) 
+recoveredAgent = arr (const Recovered)
 \end{code}
 
 The function below describes the behaviour of an infected agent. This
@@ -504,31 +504,31 @@ susceptible (no event)
 \begin{code}
 susceptibleAgent :: RandomGen g => Disc2dCoord -> SIRAgent g
 susceptibleAgent _coord
-    = switch 
+    = switch
       -- delay the switching by 1 step, otherwise could
       -- make the transition from Susceptible to Recovered within time-step
       (susceptible >>> iPre (Susceptible, NoEvent))
       (const infectedAgent)
   where
-    susceptible :: RandomGen g 
+    susceptible :: RandomGen g
                 => SF (SIRMonad g) SIREnv (SIRState, Event ())
     susceptible = proc env -> do
-      -- use occasionally to make contact on average 
+      -- use occasionally to make contact on average
       makeContact <- occasionally (1 / contactRate) () -< ()
 
-      if not $ isEvent makeContact 
+      if not $ isEvent makeContact
         then returnA -< (Susceptible, NoEvent)
         else (do
           -- take env, the dimensions of grid and neighbourhood info
           --let ns = neighbours env coord agentGridSize moore
-          -- queries the environemtn for its neighbours - in this case appears to be all neighbours 
+          -- queries the environemtn for its neighbours - in this case appears to be all neighbours
           let ns = allNeighbours env
           s <- drawRandomElemS -< ns -- randomly selects one
           case s of
             Infected -> do
               infected <- arrM (const (lift $ randomBoolM infectivity)) -< ()
               -- upon infection,
-              if infected 
+              if infected
                 -- event returned which returns in switching into the infected agent SF (to behave as such)
                 then returnA -< (Infected, Event ())
                 else returnA -< (Susceptible, NoEvent)
@@ -555,7 +555,7 @@ simulationStep :: RandomGen g
                -> SIREnv
                -> SF (SIRMonad g) () SIREnv
 simulationStep sfsCoords env = MSF $ \_ -> do
-    let (sfs, coords) = unzip sfsCoords 
+    let (sfs, coords) = unzip sfsCoords
 
     -- run all agents sequentially but keep the environment
     -- read-only: it is shared as input with all agents
@@ -565,7 +565,7 @@ simulationStep sfsCoords env = MSF $ \_ -> do
     -- construct new environment from all agent outputs for next step
     let (as, sfs') = unzip ret
         env' = foldr (\(coord, a) envAcc -> updateCell coord a envAcc) env (zip coords as)
-        
+
         sfsCoords' = zip sfs' coords
         cont       = simulationStep sfsCoords' env'
     return (env', cont)
@@ -647,7 +647,7 @@ visualiseSimulation dt ctx0 = do
     ctxRef <- newIORef ctx0
 
     GLOAnim.animateIO
-    
+
       (GLO.InWindow winTitle winSize (0, 0))
       GLO.white
       (nextFrame ctxRef)
@@ -661,18 +661,18 @@ visualiseSimulation dt ctx0 = do
 
     nextFrame :: RandomGen g
               => IORef (SimCtx g)
-              -> Float 
+              -> Float
               -> IO GLO.Picture
     nextFrame ctxRef _ = do
       ctx <- readIORef ctxRef
-      
+
       let ctx' = runStepCtx dt ctx
       writeIORef ctxRef ctx'
 
       return $ ctxToPic ctx
 
 ctxToPic :: RandomGen g
-             => SimCtx g 
+             => SimCtx g
              -> GLO.Picture
 ctxToPic ctx = GLO.Pictures $ aps ++ [timeStepTxt]
       where
@@ -717,7 +717,7 @@ required for the function that produces the gif.
 
 \begin{code}
 animation :: RandomGen g => [SimCtx g] -> DTime -> Time -> SimCtx g
--- bc of the gif time to pictures conversion. Lists of context -> time to context 
+-- bc of the gif time to pictures conversion. Lists of context -> time to context
 animation ctxs dt t = ctxs !! floor (t / dt)
 \end{code}
 
@@ -740,11 +740,11 @@ runSimulationUntil tMax dt ctx0 = runSimulationAux 0 ctx0 []
                       -> SimCtx g
                       -> [(Double, Double, Double)]
                       -> [(Double, Double, Double)]
-    runSimulationAux t ctx acc 
-        | t >= tMax = acc -- if time step is greater than tmax, 
+    runSimulationAux t ctx acc
+        | t >= tMax = acc -- if time step is greater than tmax,
         | otherwise = runSimulationAux t' ctx' acc'
       where
-        env  = simEnv ctx -- 
+        env  = simEnv ctx --
         aggr = aggregateStates $ elems env
 
         t'   = t + dt -- increase time by timestep
@@ -790,7 +790,7 @@ this.
 
 \begin{code}
 decodeCSV :: BL.ByteString -> Either String (V.Vector (Int, Int, Int))
-decodeCSV  = decode NoHeader  
+decodeCSV  = decode NoHeader
 
 getResults :: IO ([(Int, Int)], [(Int, Int)], [(Int, Int)])
 getResults = do
