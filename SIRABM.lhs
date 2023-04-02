@@ -280,6 +280,74 @@ them if a neighbour is infected or not.
 
 \info[inline]{I know we have to have this here in Python notebook but I think it would be better to explain how the agents get updated first - maybe we can even do this in the notebook by defining things but not running them}
 
+\subsection{Susceptible Agents}
+
+\textit{susceptibleAgent} describes the behaviour of a susceptible agent ---
+which is governed by querying the surrounding neighbours and either
+getting infected based on the parameter $\gamma$ (event generated) or staying
+susceptible (no event).
+
+\improvement[inline]{I think we need to say something about the arrow notation here. I think \textit{proc} and \textit{-<} is something like the monadic do notation so that you can avoid using point-free style which can be quite hard to read - so it is syntactic sugar}
+
+\unsure[inline]{I would expect a poisson process here but afaics \textit{occasionally} does not do that --- I think we used an exponential distribution in our previous model?}
+
+\info[inline]{Here's what we had in Julia}
+
+\begin{verbatim}
+function transmit!(agent, model)
+    agent.status != :S && return
+    ncontacts = rand(Poisson(model.properties[:c]))
+    for i in 1:ncontacts
+        alter = random_agent(model)
+        if alter.status == :I && (rand() ≤ model.properties[:β])
+            agent.status = :J
+            break
+        end
+    end
+end;
+\end{verbatim}
+
+\improvement[inline]{Now that I have thought about it for a bit longer, maybe we should just leave the code as it is but with a footnote or aside to say that we should really use a Poisson distribution}
+
+\change[inline]{I removed this comment: -- use occasionally to make contact on average}
+
+\begin{code}
+susceptible :: RandomGen g
+            => Disc2dCoord -> SF (SIRMonad g) SIREnv (SIRState, Event ())
+susceptible coord = proc env -> do
+  makeContact <- occasionally (1 / contactRate) () -< ()
+
+  if not (isEvent makeContact)
+    then returnA -< (Susceptible, NoEvent)
+    else (do
+      -- take env, the dimensions of grid and neighbourhood info
+      --let ns = neighbours env coord agentGridSize moore
+      -- queries the environemtn for its neighbours - in this case appears to be all neighbours
+      let ns = neighbours env coord agentGridSize moore -- allNeighbours env
+      s <- drawRandomElemS -< ns -- randomly selects one
+      case s of
+        Infected -> do
+          infected <- arrM (const (lift $ randomBoolM infectivity)) -< ()
+          -- upon infection,
+          if infected
+            -- event returned which returns in switching into the infected agent SF (to behave as such)
+            then returnA -< (Infected, Event ())
+            else returnA -< (Susceptible, NoEvent)
+        _       -> returnA -< (Susceptible, NoEvent))
+\end{code}
+
+      -- delay the switching by 1 step, otherwise could
+      -- make the transition from Susceptible to Recovered
+
+\begin{code}
+susceptibleAgent :: RandomGen g => Disc2dCoord -> SIRAgent g
+susceptibleAgent coord
+    = switch
+      (susceptible coord >>> iPre (Susceptible, NoEvent))
+      (const infectedAgent)
+  where
+\end{code}
+
 To enforce the simulation rules, various simulation parameters are
 defined: the contact rate $\beta$, the infection rate $\gamma$,
 recovery rate $\delta$ and the grid size.
@@ -517,45 +585,6 @@ infectedAgent
         -- otherwise recovered agent as the updated state
         then returnA -< (Recovered, Event ())
         else returnA -< (Infected, NoEvent)
-\end{code}
-
-`susceptibleAgent` describes the behaviour of a susceptible agent -
-which is governed by querying the surrounding neighbours and either
-getting infected based on the parameter γ (event generated) or staying
-susceptible (no event)
-
-\begin{code}
-susceptibleAgent :: RandomGen g => Disc2dCoord -> SIRAgent g
-susceptibleAgent coord
-    = switch
-      -- delay the switching by 1 step, otherwise could
-      -- make the transition from Susceptible to Recovered within time-step
-      (susceptible >>> iPre (Susceptible, NoEvent))
-      (const infectedAgent)
-  where
-    susceptible :: RandomGen g
-                => SF (SIRMonad g) SIREnv (SIRState, Event ())
-    susceptible = proc env -> do
-      -- use occasionally to make contact on average
-      makeContact <- occasionally (1 / contactRate) () -< ()
-
-      if not $ isEvent makeContact
-        then returnA -< (Susceptible, NoEvent)
-        else (do
-          -- take env, the dimensions of grid and neighbourhood info
-          --let ns = neighbours env coord agentGridSize moore
-          -- queries the environemtn for its neighbours - in this case appears to be all neighbours
-          let ns = neighbours env coord agentGridSize moore -- allNeighbours env
-          s <- drawRandomElemS -< ns -- randomly selects one
-          case s of
-            Infected -> do
-              infected <- arrM (const (lift $ randomBoolM infectivity)) -< ()
-              -- upon infection,
-              if infected
-                -- event returned which returns in switching into the infected agent SF (to behave as such)
-                then returnA -< (Infected, Event ())
-                else returnA -< (Susceptible, NoEvent)
-            _       -> returnA -< (Susceptible, NoEvent))
 \end{code}
 
 `sirAgent` defines the behaviour of the agent depending on the initial
