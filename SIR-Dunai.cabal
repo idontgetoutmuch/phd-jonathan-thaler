@@ -9,7 +9,8 @@ extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
 executable SIR-Dunai
-  main-is:             Main.hs
+  main-is:             SIRABM.lhs
+                       -- Main.hs
   build-depends:        base
                       , bearriver
                       , dunai

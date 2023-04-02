@@ -22,6 +22,8 @@
 
 \maketitle
 
+\listoftodos
+
 In 1978, anonymous authors sent a note to the British Medical Journal
 reporting an influenza outbreak in a boarding school in the north of
 England (\cite{bmj-influenza}). The chart below shows the solution of the
@@ -43,7 +45,7 @@ An alternative to modelling via differential equations is to use an
 agent-based model (ABM), a computational model which uses a bottom-up
 approach to simulate the actions and interactions of the system's
 constituent units (agents) to capture the global system
-behaviour.\improvement{I wonder if we could get Adrianne to give us a
+behaviour.\improvement[inline]{I wonder if we could get Adrianne to give us a
 few words about why ABMs are now popular? I can guess but she really
 is an expert.} The autonomous agents are assigned characteristics
 (e.g. age) and follow various rules to ensure viable system
@@ -80,7 +82,7 @@ for more on arrows vs monads).
 The central concept of arrowised FRP is the Signal Function (SF). The SF
 represents a process overtime which maps an input signal to an output
 signal. Thus, signifying that SFs have an awareness of the passing of
-time through the timestep of the system\unsure{I don't know what you are trying to say here}. This concept of using
+time through the timestep of the system\unsure[inline]{I don't know what you are trying to say here}. This concept of using
 time-varying functions as a method of handling agent-based models is
 essential due to their time-dependent nature (see more
 [here](https://www.cs.yale.edu/publications/techreports/tr1049.pdf)).
@@ -92,7 +94,7 @@ Futher reading on FRP concepts can be found \href{https://ivanperez.io/papers/20
 The goal is to use a Functional Reactive Programming (FRP) approach in
 Haskell to simulate a SIR (Susceptible, Infected, Recovered) model -
 which is a simple compartmental model. The general result within such a
-SIR model is as below:\change{I was unable to get these PNGs. Can we store them in the repo?}
+SIR model is as below:\change[inline]{I was unable to get these PNGs. Can we store them in the repo?}
 
 \begin{figure}[h]
     \centering
@@ -128,6 +130,8 @@ Various modules required for the different aspect of simulation must be
 loaded.
 
 \begin{code}
+module Main (main) where
+
 import           Data.IORef
 import           System.IO
 import           Text.Printf
@@ -174,20 +178,20 @@ for the ADT.
 data SIRState = Susceptible | Infected | Recovered deriving (Show, Eq)
 \end{code}
 
-Define 2D environment
+\subsection{Define 2D environment}
 
-In this model, a N x A grid is used to define the spatial aspect of the
-model. Here, the discrete 2D environment is defined with a tuple.
+In this model, a $N \times M$ grid is used to define the spatial aspect of the
+model. Here, the discrete 2D environment is defined with a tuple.\improvement[inline]{Something like: were this to be modelled via differential equations, we would have to use partial differential equations. With one time dimension and two spatial dimensions, such differential equations are amenable to numerical methods but if the dimensions were significantly higher then ABMs start to show their advantage.}
 
 \begin{code}
 type Disc2dCoord  = (Int, Int)
 \end{code}
 
-Define types to store agent's environment
+\subsection{Define types to store agent's environment}
 
 During the simulation, the location and state of each agent must be
 retrievable. Hence, the type `SIREnv` is defined to allow agents to
-store their location coordinate and their state in an array.
+store their location coordinate and their state in an array.\unsure[inline]{I think there must be an assumption that every position contains an agent and this agent is either Susceptible, Infected or Recovered. Do you agree? And if so, can we make this explicit?}
 
 \begin{code}
 type SIREnv       = Array Disc2dCoord SIRState
@@ -201,18 +205,18 @@ number generator `g`
 type SIRMonad g   = Rand g
 \end{code}
 
-Define the SIR Agent
+\subsection{Define the SIR Agent}
 
-`SIRAgent` is used to define Agents as Signal functions which receives
+\textit{SIRAgent} is used to define Agents as Signal functions which receives
 the SIR states of all agents as input and outputs the current SIR state
-of the agent. It also returns the output in a `SIRMonad` context - which
+of the agent. It also returns the output in a \textit{SIRMonad} context - which
 is building the monad over a rand monad.
 
 \begin{code}
 type SIRAgent g   = SF (SIRMonad g) SIREnv SIRState
 \end{code}
 
-`SimSF` type is similar to `SIRagent` above, however it does not receive
+\textit{SimSF} type is similar to \textit{SIRagent} above, however it does not receive
 any inputs and just outputs the current location and state of the agent.
 This is useful in instances where states of neighbours must be accessed
 by an agent to determine whether infection occurs.
@@ -221,11 +225,11 @@ by an agent to determine whether infection occurs.
 type SimSF g = SF (SIRMonad g) () SIREnv
 \end{code}
 
-Defining simulation context
+\subsection{Defining simulation context}
 
 A simulation context data struct which contains the various parameters
-(e.g. simulation time) is defined in terms of their type. The ! is used
-to specific it is a strictness declaration.
+(e.g. simulation time) is defined in terms of their type. The \textit{!} is used
+to specific it is a strictness declaration.\change[inline]{I probably should have said this earlier but the reason for using strictness annotations is to avoid space leaks - I can explain this when we meet}
 
 \begin{code}
 data SimCtx g = SimCtx
@@ -237,40 +241,59 @@ data SimCtx g = SimCtx
   }
 \end{code}
 
-Simulation Rules
+\subsection{Simulation Rules}
 
-In this simulation, the rules are: - There is a population of size N in
-which all agents are either Susceptible, Infected or Recovered at a
-particular time. - Initially, there is at least one infected person in
-the population. - People interact with each other on average with a
-given rate of β per time-unit. - People become infected with a given
-probability γ when interacting with an infected person. - When infected,
-a person recovers on average after δ time-units. - An infected person is
-immune to further infections (no reinfection). - The 2D environment has
-either Moore or von Neumann neighbourhood. - Agents are either static or
-can move freely around the cells. - The cells allow either single or
-multiple occupants. - Agents can read the states of all their neighbours
-which tells them if a neighbour is infected or not.
+In this simulation, the rules are:
 
-Simulation Parameters set up
+\begin{itemize}
+
+\item There is a population of size $N$ in which all agents are either
+Susceptible, Infected or Recovered at a particular time.
+
+\item Initially, there is at least one infected person in the
+population.
+
+\item People interact with each other on average with a given rate of
+$\beta$ per time-unit.
+
+\item People become infected with a given probability $\gamma$ when
+interacting with an infected person.
+
+\item When infected, a person recovers on average after $\delta$
+time-units.
+
+\item An infected person is immune to further infections (no
+reinfection).
+
+\item The 2D environment has either Moore or von Neumann neighbourhood.
+
+\item Agents are either static or can move freely around the cells.
+
+\item The cells allow either single or multiple occupants.
+
+\item Agents can read the states of all their neighbours which tells
+them if a neighbour is infected or not.
+
+\end{itemize}
+
+\subsection{Simulation Parameters set up}
+
+\info[inline]{I know we have to have this here in Python notebook but I think it would be better to explain how the agents get updated first - maybe we can even do this in the notebook by defining things but not running them}
 
 To enforce the simulation rules, various simulation parameters are
-defined.
+defined: the contact rate $\beta$, the infection rate $\gamma$,
+recovery rate $\delta$ and the grid size.
 
 \begin{code}
--- contact rate or β
 contactRate :: Double
 contactRate = 5.0
 
--- Infection rate or γ
 infectivity :: Double
 infectivity = 0.05
 
--- Recovery rate or δ
 illnessDuration :: Double
 illnessDuration = 15.0
 
--- 2D grid size
 agentGridSize :: (Int, Int)
 agentGridSize = (51, 51)
 \end{code}
@@ -503,7 +526,7 @@ susceptible (no event)
 
 \begin{code}
 susceptibleAgent :: RandomGen g => Disc2dCoord -> SIRAgent g
-susceptibleAgent _coord
+susceptibleAgent coord
     = switch
       -- delay the switching by 1 step, otherwise could
       -- make the transition from Susceptible to Recovered within time-step
@@ -522,7 +545,7 @@ susceptibleAgent _coord
           -- take env, the dimensions of grid and neighbourhood info
           --let ns = neighbours env coord agentGridSize moore
           -- queries the environemtn for its neighbours - in this case appears to be all neighbours
-          let ns = allNeighbours env
+          let ns = neighbours env coord agentGridSize moore -- allNeighbours env
           s <- drawRandomElemS -< ns -- randomly selects one
           case s of
             Infected -> do
