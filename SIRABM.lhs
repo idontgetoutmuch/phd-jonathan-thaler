@@ -32,7 +32,7 @@ roughly the results observed in the school.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.8\textwidth]{diagrams/Sir.png}
+    \includegraphics[width=0.8\textwidth]{diagrams/BoardingSchool78.png}
     \caption{Influenza Outbreak in Boarding School (1978)}
     \label{fig:boardingSchool1978}
 \end{figure}
@@ -156,7 +156,8 @@ import Control.Lens ((&~))
 import Diagrams.Backend.Cairo (B)
 import Diagrams.TwoD.Types (V2)
 import IHaskell.Display.Diagrams hiding (animation)
-import Plots (scatterPlot, key)
+import Plots (scatterPlot, key, r2AxisMain)
+import System.Environment
 
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv
@@ -213,7 +214,7 @@ of the agent. It also returns the output in a \textit{SIRMonad} context - which
 is building the monad over a rand monad.
 
 \begin{code}
-type SIRAgent g   = SF (SIRMonad g) SIREnv SIRState
+type SIRAgent g = SF (SIRMonad g) SIREnv SIRState
 \end{code}
 
 \textit{SimSF} type is similar to \textit{SIRagent} above, however it does not receive
@@ -280,7 +281,7 @@ them if a neighbour is infected or not.
 
 \info[inline]{I know we have to have this here in Python notebook but I think it would be better to explain how the agents get updated first - maybe we can even do this in the notebook by defining things but not running them}
 
-\subsection{Susceptible Agents}
+\subsubsection{Susceptible Agents}
 
 \textit{susceptibleAgent} describes the behaviour of a susceptible agent ---
 which is governed by querying the surrounding neighbours and either
@@ -311,33 +312,38 @@ end;
 
 \change[inline]{I removed this comment: -- use occasionally to make contact on average}
 
+We use \textit{occasionally} to determine whether an agent could have
+contacted another agent within the average time period $1 /
+\beta$. Note that we are not using the Gillespie algorithm or, as is
+often used, a Poisson distribution to determine the number of other
+agents that would be infected. We allow this agent to be potentially
+infected depending on its proximity to a possibly infected agent.
+
+\change[inline]{I removed these comments -- take env, the dimensions of grid and neighbourhood info -- let ns = neighbours env coord agentGridSize moore -- queries the environemtn for its neighbours - in this case appears to be all neighbours -- randomly selects one -- upon infection -- event returned which returns in switching into the infected agent SF (to behave as such)
+}
+
 \begin{code}
 susceptible :: RandomGen g
             => Disc2dCoord -> SF (SIRMonad g) SIREnv (SIRState, Event ())
 susceptible coord = proc env -> do
   makeContact <- occasionally (1 / contactRate) () -< ()
-
   if not (isEvent makeContact)
     then returnA -< (Susceptible, NoEvent)
-    else (do
-      -- take env, the dimensions of grid and neighbourhood info
-      --let ns = neighbours env coord agentGridSize moore
-      -- queries the environemtn for its neighbours - in this case appears to be all neighbours
-      let ns = neighbours env coord agentGridSize moore -- allNeighbours env
-      s <- drawRandomElemS -< ns -- randomly selects one
+    else do
+      let ns = neighbours env coord agentGridSize Nothing -- (Just moore)
+      s <- drawRandomElemS -< ns
       case s of
         Infected -> do
           infected <- arrM (const (lift $ randomBoolM infectivity)) -< ()
-          -- upon infection,
           if infected
-            -- event returned which returns in switching into the infected agent SF (to behave as such)
             then returnA -< (Infected, Event ())
             else returnA -< (Susceptible, NoEvent)
-        _       -> returnA -< (Susceptible, NoEvent))
+        _ -> returnA -< (Susceptible, NoEvent)
 \end{code}
 
-      -- delay the switching by 1 step, otherwise could
-      -- make the transition from Susceptible to Recovered
+We delay the switching by 1 step, otherwise the agent could make the
+transition from Susceptible to Recovered in one time step, not
+something we want to have in our model.
 
 \begin{code}
 susceptibleAgent :: RandomGen g => Disc2dCoord -> SIRAgent g
@@ -345,8 +351,46 @@ susceptibleAgent coord
     = switch
       (susceptible coord >>> iPre (Susceptible, NoEvent))
       (const infectedAgent)
+\end{code}
+
+\subsubsection{Infected Agents}
+
+The function below describes the behaviour of an infected agent. This
+behaviour is governed by either recovering on average after delta time
+units or staying infected within a timestep.
+
+\begin{code}
+infected :: RandomGen g => SF (SIRMonad g) SIREnv (SIRState, Event ())
+infected = proc _ -> do
+  recovered <- occasionally illnessDuration () -< ()
+  if isEvent recovered
+    then returnA -< (Recovered, Event ())
+    else returnA -< (Infected, NoEvent)
+\end{code}
+
+Again we delay the switching by 1 step, otherwise could make the
+transition from Susceptible to Recovered within time-step.
+
+\begin{code}
+infectedAgent :: RandomGen g => SIRAgent g
+infectedAgent
+    = switch
+      (infected >>> iPre (Infected, NoEvent))
+      (const recoveredAgent)
   where
 \end{code}
+
+\subsubsection{Recovered Agents}
+
+Unlike the other states, the recovered state does not generate any event
+and rather just acts a sink which constantly returns Recovered.
+
+\begin{code}
+recoveredAgent :: RandomGen g => SIRAgent g
+recoveredAgent = arr (const Recovered)
+\end{code}
+
+\section{Whatever}
 
 To enforce the simulation rules, various simulation parameters are
 defined: the contact rate $\beta$, the infection rate $\gamma$,
@@ -357,13 +401,13 @@ contactRate :: Double
 contactRate = 5.0
 
 infectivity :: Double
-infectivity = 0.05
+infectivity = 0.10
 
 illnessDuration :: Double
 illnessDuration = 15.0
 
 agentGridSize :: (Int, Int)
-agentGridSize = (51, 51)
+agentGridSize = (27, 28)
 \end{code}
 
 The outputs of the simulation will be a CSV file containing the data and
@@ -541,50 +585,16 @@ all neighbours or agents.
 neighbours :: SIREnv
            -> Disc2dCoord
            -> Disc2dCoord
-           -> [Disc2dCoord]
+           -> Maybe [Disc2dCoord]
            -> [SIRState]
-neighbours e (x, y) (dx, dy) n = map (e !) nCoords'
+neighbours e _ _ Nothing = elems e
+neighbours e (x, y) (dx, dy) (Just n) = map (e !) nCoords'
   where
     nCoords  = map (\(x', y') -> (x + x', y + y')) n
     nCoords' = filter (\(nx, ny) -> nx >= 0 &&
                                     ny >= 0 &&
                                     nx <= (dx - 1) &&
                                   ny <= (dy - 1)) nCoords
-
-
-allNeighbours :: SIREnv -> [SIRState]
-allNeighbours = elems
-\end{code}
-
-Unlike the other states, the recovered state does not generate any event
-and rather just acts a sink which constantly returns Recovered.
-
-\begin{code}
-recoveredAgent :: RandomGen g => SIRAgent g
-recoveredAgent = arr (const Recovered)
-\end{code}
-
-The function below describes the behaviour of an infected agent. This
-behaviour is governed by either recovering on average after delta time
-units or staying infected within a timestep.
-
-\begin{code}
-infectedAgent :: RandomGen g => SIRAgent g
-infectedAgent
-    = switch
-      -- delay the switching by 1 step, otherwise could
-      -- make the transition from Susceptible to Recovered within time-step
-      (infected >>> iPre (Infected, NoEvent))
-      (const recoveredAgent)
-  where
-    infected :: RandomGen g => SF (SIRMonad g) SIREnv (SIRState, Event ())
-    infected = proc _ -> do
-      -- illness duration = infected agent
-      recovered <- occasionally illnessDuration () -< ()
-      if isEvent recovered
-        -- otherwise recovered agent as the updated state
-        then returnA -< (Recovered, Event ())
-        else returnA -< (Infected, NoEvent)
 \end{code}
 
 `sirAgent` defines the behaviour of the agent depending on the initial
@@ -633,12 +643,12 @@ and recovered agents within the simulation. This function is used both
 for the animation and the plot.
 
 \begin{code}
-aggregateStates :: [SIRState] -> (Double, Double, Double)
+aggregateStates :: [SIRState] -> (Int, Int, Int)
 aggregateStates as = (susceptibleCount, infectedCount, recoveredCount)
   where
-    susceptibleCount = fromIntegral $ length $ filter (Susceptible==) as
-    infectedCount = fromIntegral $ length $ filter (Infected==) as
-    recoveredCount = fromIntegral $ length $ filter (Recovered==) as
+    susceptibleCount = length $ filter (Susceptible==) as
+    infectedCount    = length $ filter (Infected==) as
+    recoveredCount   = length $ filter (Recovered==) as
 \end{code}
 
 Functions for generating CSV file
@@ -783,15 +793,15 @@ runSimulationUntil :: RandomGen g
                    => Time
                    -> DTime
                    -> SimCtx g
-                   -> [(Double, Double, Double)]
+                   -> [(Int, Int, Int)]
 -- With the max time, time step and initial context, run simulation via the Aux function
 runSimulationUntil tMax dt ctx0 = runSimulationAux 0 ctx0 []
   where
     runSimulationAux :: RandomGen g
                       => Time
                       -> SimCtx g
-                      -> [(Double, Double, Double)]
-                      -> [(Double, Double, Double)]
+                      -> [(Int, Int, Int)]
+                      -> [(Int, Int, Int)]
     runSimulationAux t ctx acc
         | t >= tMax = acc -- if time step is greater than tmax,
         | otherwise = runSimulationAux t' ctx' acc'
@@ -831,7 +841,7 @@ main = do
     else do
       let ts = [0.0, dt .. t]
       let ctxs = evaluateCtxs (length ts) dt ctx
-      exportPicturesToGif 10 LoopingForever (800, 800) GLO.white "SIR.gif" ((ctxToPic . (animation ctxs dt)) . uncurry encodeFloat . decodeFloat) (map (uncurry encodeFloat . decodeFloat) ts)
+      -- exportPicturesToGif 10 LoopingForever (800, 800) GLO.white "SIR.gif" ((ctxToPic . (animation ctxs dt)) . uncurry encodeFloat . decodeFloat) (map (uncurry encodeFloat . decodeFloat) ts)
       writeSimulationUntil t dt ctx "SIR_DUNAI_dt001.csv"
 \end{code}
 
@@ -846,9 +856,9 @@ decodeCSV  = decode NoHeader
 
 getResults :: IO ([(Int, Int)], [(Int, Int)], [(Int, Int)])
 getResults = do
-    csvData <- BL.readFile "myFile.csv"
+    csvData <- BL.readFile "SIR_DUNAI_dt001.csv"
     let x = decodeCSV csvData
-    case decode NoHeader csvData of
+    case decode HasHeader csvData of
         Left err -> error err
         Right y -> do let (a,b,c) = addToList y
                       let d = zip [1..length a] a --data that I want to use for plotting (trace 1 - S)
@@ -866,14 +876,10 @@ scatterAxis2 (d, e, f) = r2Axis &~ do
     scatterPlot (map (\(x,y) -> (fromIntegral x, fromIntegral y)) d) $ key "S"
     scatterPlot (map (\(x,y) -> (fromIntegral x, fromIntegral y)) e) $ key "I"
     scatterPlot (map (\(x,y) -> (fromIntegral x, fromIntegral y)) f) $ key "R"
---
--- scatterExample2 = renderAxis scatterAxis2
--- diagram scatterExample2
+
 main1 = do
   (d,e,f) <- getResults
-  let scatterExample2 = renderAxis $ scatterAxis2 (d, e, f)
-  let diagram2 = diagram scatterExample2
-  return ()
+  withArgs ["-odiagrams/BoardingSchool78.png"] (r2AxisMain $ scatterAxis2 (d, e, f))
 \end{code}
 
 ![svg](output_82_0.svg)
