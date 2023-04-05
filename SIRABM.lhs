@@ -1,6 +1,9 @@
 \documentclass{article}
 %include polycode.fmt
 
+%format -< = "\Lleftarrow"
+%format >>> = "\rightsquigarrow"
+
 \usepackage[colorlinks]{hyperref}
 \usepackage[pdftex,dvipsnames]{xcolor}
 \usepackage{xargs}
@@ -300,7 +303,7 @@ function transmit!(agent, model)
     ncontacts = rand(Poisson(model.properties[:c]))
     for i in 1:ncontacts
         alter = random_agent(model)
-        if alter.status == :I && (rand() ≤ model.properties[:β])
+        if alter.status == :I && (rand() <= model.properties[:β])
             agent.status = :J
             break
         end
@@ -330,7 +333,7 @@ susceptible coord = proc env -> do
   if not (isEvent makeContact)
     then returnA -< (Susceptible, NoEvent)
     else do
-      let ns = neighbours env coord agentGridSize Nothing -- (Just moore)
+      let ns = neighbours env coord agentGridSize Nothing
       s <- drawRandomElemS -< ns
       case s of
         Infected -> do
@@ -377,7 +380,6 @@ infectedAgent
     = switch
       (infected >>> iPre (Infected, NoEvent))
       (const recoveredAgent)
-  where
 \end{code}
 
 \subsubsection{Recovered Agents}
@@ -601,15 +603,30 @@ neighbours e (x, y) (dx, dy) (Just n) = map (e !) nCoords'
 state. Only the suspectible agent receives the coordinates as the
 infected and recovered agents do not require this information.
 
+ -- recovered agent ignores gen bc they stay immune
+
 \begin{code}
 sirAgent :: RandomGen g => Disc2dCoord -> SIRState -> SIRAgent g
 sirAgent coord Susceptible = susceptibleAgent coord
 sirAgent _     Infected    = infectedAgent
-sirAgent _     Recovered   = recoveredAgent -- recovered agent ignores gen bc they stay immune
+sirAgent _     Recovered   = recoveredAgent
 \end{code}
 
 The simulationStep function is a closed feedback loop which takes the
 current signal functions and returns the new agent states.
+
+|unMSF :: MSF m a b -> a -> m (b, MSF m a b)| executes one step of a
+simulation, and produces an output in a monadic context, and a
+continuation to be used for future steps.
+
+We run all agents sequentially keeping the environment read-only; it
+is shared as input with all agents and thus cannot be changed by the
+agents themselves.
+
+We then construct new environment from all agent outputs for next step
+using |(\\)| which takes an array and a list of pairs and returns an
+array identical to the left argument except that it has been updated
+by the associations in the right argument.
 
 \begin{code}
 simulationStep :: RandomGen g
@@ -617,23 +634,13 @@ simulationStep :: RandomGen g
                -> SIREnv
                -> SF (SIRMonad g) () SIREnv
 simulationStep sfsCoords env = MSF $ \_ -> do
-    let (sfs, coords) = unzip sfsCoords
-
-    -- run all agents sequentially but keep the environment
-    -- read-only: it is shared as input with all agents
-    -- and thus cannot be changed by the agents themselves
-    -- run agents sequentially but with shared, read-only environment
-    ret <- mapM (`unMSF` env) sfs
-    -- construct new environment from all agent outputs for next step
-    let (as, sfs') = unzip ret
-        env' = foldr (\(coord, a) envAcc -> updateCell coord a envAcc) env (zip coords as)
-
-        sfsCoords' = zip sfs' coords
-        cont       = simulationStep sfsCoords' env'
-    return (env', cont)
-  where
-    updateCell :: Disc2dCoord -> SIRState -> SIREnv -> SIREnv
-    updateCell c s e = e // [(c, s)]
+  let (sfs, coords) = unzip sfsCoords
+  ret <- mapM (`unMSF` env) sfs
+  let (as, sfs') = unzip ret
+      env' = foldr (\(coord, a) envAcc -> envAcc // [(coord, a)]) env (zip coords as)
+      sfsCoords' = zip sfs' coords
+      cont       = simulationStep sfsCoords' env'
+  return (env', cont)
 \end{code}
 
 Functions related to collating simulation data
@@ -745,19 +752,25 @@ ctxToPic ctx = GLO.Pictures $ aps ++ [timeStepTxt]
 
           (tcx, tcy)  = transformToWindow (-7, 10)
           timeTxt     = printf "%0.1f" t
-          timeStepTxt = GLO.color GLO.black $ GLO.translate tcx tcy $ GLO.scale 0.5 0.5 $ GLO.Text timeTxt
+          timeStepTxt = GLO.color GLO.black $ GLO.translate tcx tcy $
+                        GLO.scale 0.5 0.5 $ GLO.Text timeTxt
 
 renderAgent :: (Disc2dCoord, SIRState) -> GLO.Picture
 renderAgent (coord, Susceptible)
-    = GLO.color (GLO.makeColor 0.0 0.0 0.7 1.0) $ GLO.translate x y $ GLO.Circle (realToFrac cellWidth / 2)
+    = GLO.color (GLO.makeColor 0.0 0.0 0.7 1.0) $
+      GLO.translate x y $ GLO.Circle (realToFrac cellWidth / 2)
   where
     (x, y) = transformToWindow coord
 renderAgent (coord, Infected)
-    = GLO.color (GLO.makeColor 0.7 0.0 0.0 1.0) $ GLO.translate x y $ GLO.ThickCircle 0 (realToFrac cellWidth)
+    = GLO.color (GLO.makeColor 0.7 0.0 0.0 1.0) $
+      GLO.translate x y $
+      GLO.ThickCircle 0 (realToFrac cellWidth)
   where
     (x, y) = transformToWindow coord
 renderAgent (coord, Recovered)
-    = GLO.color (GLO.makeColor 0.0 0.70 0.0 1.0) $ GLO.translate x y $ GLO.ThickCircle 0 (realToFrac cellWidth)
+    = GLO.color (GLO.makeColor 0.0 0.70 0.0 1.0) $
+      GLO.translate x y $
+      GLO.ThickCircle 0 (realToFrac cellWidth)
   where
     (x, y) = transformToWindow coord
 
@@ -882,7 +895,7 @@ main1 = do
   withArgs ["-odiagrams/BoardingSchool78.png"] (r2AxisMain $ scatterAxis2 (d, e, f))
 \end{code}
 
-![svg](output_82_0.svg)
+![svg](output\_82\_0.svg)
 
 The GIF below shows the spread of infection overtime
 
