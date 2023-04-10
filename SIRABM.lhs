@@ -1,18 +1,18 @@
 \documentclass{article}
 %include polycode.fmt
 
-%v \leftarrow \operatorname{arr}(+v 0) \lll \text { integral } \prec(-9.8)
-
-%format -< = "\Lleftarrow"
-%format >>> = "\rightsquigarrow"
+%format -< = "\leftbroom"
+%format >>> = "\ggg"
+%format <<< = "\lll"
 
 \usepackage[colorlinks]{hyperref}
 \usepackage[pdftex,dvipsnames]{xcolor}
 \usepackage{xargs}
+\usepackage{halloweenmath}
 
 \input{answer.tex}
 
-\usepackage[colorinlistoftodos,prependcaption,textsize=tiny]{todonotes}
+\usepackage[obeyDraft,colorinlistoftodos,prependcaption,textsize=tiny]{todonotes}
 \newcommandx{\unsure}[2][1=]{\todo[linecolor=red,backgroundcolor=red!25,bordercolor=red,#1]{#2}}
 \newcommandx{\change}[2][1=]{\todo[linecolor=blue,backgroundcolor=blue!25,bordercolor=blue,#1]{#2}}
 \newcommandx{\info}[2][1=]{\todo[linecolor=OliveGreen,backgroundcolor=OliveGreen!25,bordercolor=OliveGreen,#1]{#2}}
@@ -35,7 +35,7 @@ In 1978, anonymous authors sent a note to the British Medical Journal
 reporting an influenza outbreak in a boarding school in the north of
 England (\cite{bmj-influenza}). The chart below shows the solution of the
 SIR (Susceptible, Infected, Record) model with parameters which give
-roughly the results observed in the school.
+roughly the results observed in the school.\change{This should be the actual data not the output of our model}
 
 \begin{figure}[h]
     \centering
@@ -60,10 +60,10 @@ dynamics. Spatiality can also be added to simulations.
 
 Traditionally, ABM simulations are implemented as object-oriented
 programs due to the intuitive mapping of objects to agents. However,
-Functional Reactive Programming can also be used as it can guarantee the
-reproducibility of the simulation at compile time and avoid specific
-run-time bugs - which cannot be achieved in traditional object-oriented
-languages such as C\#.
+Functional Reactive Programming (which we explain below) can also be
+used as it can guarantee the reproducibility of the simulation at
+compile time and avoid specific run-time bugs - which cannot be
+achieved in traditional object-oriented languages such as C\#.\unsure{This doesn't sound quite right}
 
 The goal of this blogpost is to give an example of Agent Based
 Modelling in Haskell. It is heavily based on this \cite{thaler} and
@@ -72,15 +72,31 @@ repo}.
 
 \section{What is Functional Reactive Programming?}
 
-Functional reactive programming (FRP) provides a method of implementing
-systems with continuous and discrete time-semantics in pure functional
-languages. FRP successfully applied in many domains, such as robotics or
-user interfacing.
+In many models, we are interested in how they vary over time. Handling
+time explicitly has proven to be difficult and
+error-prone.\change{citation needed}. In Functional Reactive
+Programming (FRP), instead of so doing, we move from the domain of
+data and functions on that data, to the domain of data and
+{\it{time-varying}} functions on that data {\it{together with}}
+methods of operating on these time-varying functions. These operators
+are usually referred to as combinators and need to be sufficiently
+rich to allow models of interest to be captured in such a framework.
 
-The central abstraction in FRP is a signal, which is a value that
-varies over time. We can lift an ordinary function to be a time-varying function using the |arr| operator.
+FRP successfully applied in many domains, such as robotics or user interfacing.\improvement{We could do with a few more examples with a bit more detail}
 
+As already hinted, the central abstraction in FRP is a signal, which
+is a value that varies over time: |Time -> value|. We need to be able
+to lift an ordinary function to be a time-varying function. This is
+done using the |arr| operator. Figure~\ref{fig-arrOperator} depicts a
+function |f| being lifted to be a time-varying process.
+
+\begin{figure}
+\[
 \input{arrOperator.tex}
+\]
+\caption{|arr| combinator}
+\label{fig-arrOperator}
+\end{figure}
 
 These signals can be composed directly or by composing
 signal functions. FRP libaries generally use arrows to implement
