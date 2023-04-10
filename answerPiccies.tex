@@ -1,0 +1,19 @@
+\begin{tikzcd}[boxes, io=1:1]
+  |[circ]| f
+\end{tikzcd}
+\begin{tikzcd}[boxes, io=1:2]
+   f \rar &  g
+\end{tikzcd}
+\bigskip
+
+\begin{tikzcd}[boxes, row sep=2pt, io=1:2]
+                                                      & f \\
+  |[c]| \urar[end anchor=west] \drar[end anchor=west] &   \\
+                                                      & g
+\end{tikzcd}
+\begin{tikzcd}[boxes, row sep=1em]
+  |[input=shift right, output=shift left]| f \\
+  |[c]| \uar[-, out=  0, in= -5, end anchor={[shift down]east}, out looseness=2.2]
+        \uar[   out=180, in=185, end anchor={[shift down]west}, out looseness=2.2,
+             /tikz/arrows={[flex]}]
+\end{tikzcd}

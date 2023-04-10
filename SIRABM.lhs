@@ -1,12 +1,16 @@
 \documentclass{article}
 %include polycode.fmt
 
+%v \leftarrow \operatorname{arr}(+v 0) \lll \text { integral } \prec(-9.8)
+
 %format -< = "\Lleftarrow"
 %format >>> = "\rightsquigarrow"
 
 \usepackage[colorlinks]{hyperref}
 \usepackage[pdftex,dvipsnames]{xcolor}
 \usepackage{xargs}
+
+\input{answer.tex}
 
 \usepackage[colorinlistoftodos,prependcaption,textsize=tiny]{todonotes}
 \newcommandx{\unsure}[2][1=]{\todo[linecolor=red,backgroundcolor=red!25,bordercolor=red,#1]{#2}}
@@ -73,14 +77,20 @@ systems with continuous and discrete time-semantics in pure functional
 languages. FRP successfully applied in many domains, such as robotics or
 user interfacing.
 
-The central abstraction in FRP is a signal - which is a value that
-varies over time. These signals can be composed directly or by composing
+The central abstraction in FRP is a signal, which is a value that
+varies over time. We can lift an ordinary function to be a time-varying function using the |arr| operator.
+
+\input{arrOperator.tex}
+
+These signals can be composed directly or by composing
 signal functions. FRP libaries generally use arrows to implement
 functionality rather than monads due to greater efficiency and
 modularity. Arrows are a superset of monads, hence have very similar
 uses but are more restrictive (see
 \href{https://pdf.sciencedirectassets.com/272990/1-s2.0-S1571066106X02438/1-s2.0-S1571066106001666/main.pdf?X-Amz-Security-Token=IQoJb3JpZ2luX2VjEJ7%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJGMEQCIFDg9QZeU9kXNykNtK1Y3q77oHuug09p5ti63It1vccTAiBFKp5vMEkDr9v8O6lU%2FGJEBt1WPAktubolt%2FM7Ft0eRyqzBQhXEAUaDDA1OTAwMzU0Njg2NSIMm1WFiIp%2BgTN43MxSKpAF4WtU%2BhIjuCHa7o1OJ%2FJ5MHrwqLRo%2BnhAJ7pK%2BeBHF6xEGRXFSUKaELPIEgO6CAoqLitoqxUvWasKIWiBouge9w%2FZhcoQKARlX6lw6dYnQktYC%2BzakAwobpJa1s2LEWugYNdL9j2bfEZZJ3AtIqbUlwtvbBhqAEyKxkEQHlolc9cHyaq17Vv6%2FgfPDeE%2BqM6cM5I025Q4nQcAK4cQMzb66%2BxiIVpcAGVR8gSprc7GfKIpQlVO17l7aPJ33%2FDrrNMG28QydoXVKseJN2bkGk6%2BnjlP0TItMeFC5r%2FEtx%2BpgYTS%2BpnS%2FPxWeCDUMq4HfTNB9qVMipypeP98oeGMR92%2BNjp2uhF9X2a%2BHJbdOOQVV3IxKsT5JjSJ%2FzJhp6ieJ%2BPM7%2BCSIsCQ7Udf%2FaDo0KeX6KsGtCNFh0zJFwNyel6sx1b5yPXG8t7rgC2KAGV1kaYpggNZKMoGHFDt0HUOQCIan0hiP9vW8GvX0HjI1%2FH3Kajx0qVKnbky%2FbNfGmj9gMCJBfxYpRNvO0as%2FtWBngW7QQHIQR2opY400yJxE%2BdVFCgfCDaYBuDl1sckh7O%2FbDKT%2FQtEHmRlUdYkg8BIHYsqC%2FE3nt5Sqo83JGpaL7%2F0R0TyioO8EazXMwWVDK%2B%2Fbn4AhmoxIEPuAhw%2FgkfAUtn9o7a3iZF%2BHT%2Fv6gGxKLJkI40OzkM3nTlHmd93Yceamm%2Bj%2BHUcMzkqyUxyVUGQLEuTFWJ8DrFGsLqE%2F0h9A4y1sGV48%2BYXiiRipqitUyx7fW%2F1JRuY8sPsJmLc4CnIihYXIhIhzm06xqmouOaOEuSlAFvnAuvy6f09mD8VCC8H2E%2BtqkmUciVlg4fVM3mMRHdePbtNJ8HxyaN6143%2BMD8GVVkwzdqloAY6sgFkA1yE%2BQykIX6iO2s8d%2Bsr4dc1A4L23Kw4TymTEusts%2BVxCXWhF2CU23C3MxIddMHinkuiv8u6J6tcehBM05NTGXotQgTLeL4IASQ6%2BNdj6YWRjHZ5A77E8qBMap%2FWzGzpDXLAJ4hDZWktDQ4KMpW446reCDlw0ViRPJTzaSPsCcuElkjGI34WpARqHLN149%2FSs%2FcIFWBqwhG0%2F93p3zgWt5gkv9u5lbg6ZOYZ1Bjgzm9z&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20230309T062929Z&X-Amz-SignedHeaders=host&X-Amz-Expires=300&X-Amz-Credential=ASIAQ3PHCVTY3TG3MPND%2F20230309%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=ae795e67238960dc7bcdc97d21a32e3c73d229d94f6ccf87eecdd2eb4cb17ccb&hash=6109688cb98c98a108b74ea3b2556b59fcada4fd8ea4d0942973369e63ce2e0e&host=68042c943591013ac2b2430a89b270f6af2c76d8dfd086a07176afe7c76c2c61&pii=S1571066106001666&tid=spdf-0f923ac0-927a-479a-84e6-8376df53a474&sid=749e13d39ace604f5e2bba26f52d6131b5ccgxrqa&type=client&tsoh=d3d3LnNjaWVuY2VkaXJlY3QuY29t&ua=04125300565756535e54&rr=7a514386fa4faafb&cc=au}{here}
 for more on arrows vs monads).
+
+\input{functionAsArrow.tex}
 
 The central concept of arrowised FRP is the Signal Function (SF). The SF
 represents a process overtime which maps an input signal to an output
@@ -132,6 +142,7 @@ what constraints can be used in a typeclass
 Various modules required for the different aspect of simulation must be
 loaded.
 
+%if style == newcode
 \begin{code}
 module Main (main) where
 
@@ -165,6 +176,41 @@ import System.Environment
 import qualified Data.ByteString.Lazy as BL
 import Data.Csv
 import qualified Data.Vector as V
+
+import Data.Void
+\end{code}
+%endif
+
+\begin{code}
+fallingMass :: Monad m => Double -> Double -> MSF (ClockInfo m) Void Double
+fallingMass p0 v0 =
+  arr (const (-9.81)) >>>
+  integral >>>
+  arr (+ v0) >>>
+  integral >>>
+  arr (+ p0)
+
+fallingMass' :: Monad m => Double -> Double -> MSF (ClockInfo m) Void Double
+fallingMass' p0 v0 = proc _ -> do
+    v <- arr (+v0) <<< integral -< (-9.8)
+    p <- arr (+p0) <<< integral -< v
+    returnA -< p
+
+normal :: MonadRandom m => MSF m Void (Double, Double)
+normal =
+  getRandomRS (0.0, 1.0) >>>
+  arr (\x -> ((), x)) >>>
+  first (getRandomRS (0.0, 1.0)) >>>
+  arr f
+  where
+    f (u1, u2) = ( sqrt ((-2) * log u1) * (cos (2 * pi * u2))
+                 , sqrt ((-2) * log u1) * (sin (2 * pi * u2)))
+
+testNormal :: IO ()
+testNormal = do (p1, c) <- unMSF normal undefined
+                print p1
+                (p2, _) <- unMSF c undefined
+                print p2
 \end{code}
 
 \subsection{SIR States as a Algebraic Data Type}
@@ -391,6 +437,14 @@ and rather just acts a sink which constantly returns Recovered.
 recoveredAgent :: RandomGen g => SIRAgent g
 recoveredAgent = arr (const Recovered)
 \end{code}
+
+\section{Arrowised FRP}
+
+An Arrow is a generalisation of a monad which represents a process
+that takes as input a value of type |input| and outputs a
+value of type |output|.
+
+\input{answerPiccies.tex}
 
 \section{Whatever}
 

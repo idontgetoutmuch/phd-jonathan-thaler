@@ -1,0 +1,28 @@
+\usepackage{tikz-cd}
+\usetikzlibrary{bending} % for flex
+\tikzcdset{
+  boxes/.style={
+    column sep=+1.3em,
+    arrows={->,>={Triangle[angle'=45]}},
+    every matrix/.append style={draw, inner sep=+.5em},
+    cells={nodes={draw, minimum width=1cm, font=\mathstrut}}},
+  io/.style args={#1:#2}{
+    /tikz/column #1/.append style={nodes=input},
+    /tikz/column #2/.append style={nodes=output}},
+  diagrams={baseline=-axis_height},% https://tex.stackexchange.com/a/678935/16595
+  @inputoutput/.style n args={5}{
+    start anchor={#1},#2, to path={--+(#5:1.5em)\tikztonodes},
+    execute at begin to=\tikzset{edge node={node[commutative diagrams/every cell,
+      at end, anchor={#3}]{#4}}}},
+  input/.style ={@inputoutput={west}{<-}{east}{input} {left}},
+  output/.style={@inputoutput={east}{->}{west}{output}{right}}}
+\tikzset{
+  arrows={[quick]}, % bending only when we need it
+  circ/.style={shape=circle, minimum size=+0pt},
+  c/.style={shape=coordinate},
+  @inputoutput/.style n args={4}{
+    /utils/exec=\ar[{#1,#4}], append after command=(\tikzlastnode.#2)+(#3:.12cm)},
+  input/.style={@inputoutput={input}{west}{left}{#1}},
+  output/.style={@inputoutput={output}{east}{right}{#1}},
+  shift down/.style={
+    yshift=-\pgfkeysvalueof{/tikz/commutative diagrams/shift left/.@def}}}
