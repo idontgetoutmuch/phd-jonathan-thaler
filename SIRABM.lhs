@@ -40,7 +40,7 @@
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Main (main) where
+module Main (main, main1, main', decodeCSV, runSimulationUntil, moore, neumann, whiteNoise, fallingMassMSF, fallingMass, fallingMass') where
 
 import           Data.IORef
 import           System.IO
@@ -61,12 +61,11 @@ import           Graphics.Gloss.Export
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Csv             as Csv
 import Plots.Axis  (Axis, r2Axis)
-import Plots.Axis.Render (renderAxis)
 
 import Control.Lens ((&~))
 import Diagrams.Backend.Cairo (B)
 import Diagrams.TwoD.Types (V2)
-import IHaskell.Display.Diagrams hiding (animation)
+import IHaskell.Display.Diagrams ()
 import Plots (scatterPlot, key, r2AxisMain)
 import System.Environment
 
@@ -76,8 +75,6 @@ import qualified Data.Vector as V
 
 import Control.Monad.State
 import Data.Void
-import qualified Control.Monad.Trans.MSF as MSF
-import Data.Maybe (fromMaybe)
 \end{code}
 %endif
 
@@ -200,22 +197,6 @@ fallingMass' p0 v0 = proc _ -> do
     p <- arr (+p0) <<< integral -< v
     returnA -< p
 
-normal :: MonadRandom m => MSF m () (Double, Double)
-normal =
-  getRandomRS (0.0, 1.0) >>>
-  arr (\x -> ((), x)) >>>
-  first (getRandomRS (0.0, 1.0)) >>>
-  arr f
-  where
-    f (u1, u2) = ( sqrt ((-2) * log u1) * (cos (2 * pi * u2))
-                 , sqrt ((-2) * log u1) * (sin (2 * pi * u2)))
-
-testNormal :: IO ()
-testNormal = do (p1, c) <- unMSF normal undefined
-                print p1
-                (p2, _) <- unMSF c undefined
-                print p2
-
 type FallingMassStack g = (StateT Int (RandT g IO))
 type FallingMassMSF g = SF (FallingMassStack g) () Double
 
@@ -223,17 +204,23 @@ main' :: IO ()
 main' = do
   let g0  = mkStdGen 42
       s0  = 0
-      msf = fallingMassMSF 0 100
+      -- msf = fallingMassMSF 0 100
+      msf = whiteNoise
+  runMSF g0 s0 msf
+
+main'' :: IO ()
+main'' = do
+  let g0  = mkStdGen 1729
+      s0  = 0
+      msf = brownianMotion
   runMSF g0 s0 msf
 
 arrM_ :: Monad m => m b -> MSF m a b
 arrM_ = arrM . const
 
-runMSF :: RandomGen g
-       => g
-       -> Int
-       -> FallingMassMSF g
-       -> IO ()
+runMSF :: StdGen -> Int ->
+          MSF (ReaderT DTime (StateT Int (RandT StdGen IO))) () Double ->
+          IO ()
 runMSF g s msf = do
   let msfReaderT = unMSF msf ()
       msfStateT  = runReaderT msfReaderT 0.1
@@ -242,7 +229,36 @@ runMSF g s msf = do
 
   (((p, msf'), s'), g') <- msfIO
 
-  when (p > 0) (runMSF g' s' msf')
+  when (s' <= 1000) (runMSF g' s' msf')
+
+brownianMotion :: MSF (ReaderT DTime (StateT Int (RandT StdGen IO))) () Double
+brownianMotion = proc _ -> do
+  r1 <- arrM_ (lift $ lift $ getRandomR (0.0, 1.0)) -< ()
+  r2 <- arrM_ (lift $ lift $ getRandomR (0.0, 1.0)) -< ()
+  (n1, _) <- arr f -< (r1, r2)
+  arrM_ (lift $ modify (+1)) -< ()
+  bm <- integral -< n1
+  arrM (liftIO . putStrLn) -< show bm
+  returnA -< bm
+  where
+    f (u1, u2) = ( sqrt ((-2) * log u1) * (cos (2 * pi * u2))
+                 , sqrt ((-2) * log u1) * (sin (2 * pi * u2)))
+
+whiteNoise :: RandomGen g => FallingMassMSF g
+whiteNoise = proc _ -> do
+  r1 <- arrM_ (lift $ lift $ getRandomR (0.0, 1.0)) -< ()
+  r2 <- arrM_ (lift $ lift $ getRandomR (0.0, 1.0)) -< ()
+  (n1, _) <- arr f -< (r1, r2)
+  s <- arrM_ (lift get) -< ()
+  -- arrM (liftIO . putStrLn) -< "n1 = " ++ show n1 ++ ", s = " ++ show s
+  arrM_ (lift $ modify (+1)) -< ()
+  bm <- integral -< n1
+  arrM (liftIO . putStrLn) -< show bm
+  returnA -< bm
+  where
+    f (u1, u2) = ( sqrt ((-2) * log u1) * (cos (2 * pi * u2))
+                 , sqrt ((-2) * log u1) * (sin (2 * pi * u2)))
+
 
 fallingMassMSF :: RandomGen g
                => Double -> Double -> FallingMassMSF g
@@ -469,8 +485,8 @@ susceptible coord = proc env -> do
       s <- drawRandomElemS -< ns
       case s of
         Infected -> do
-          infected <- arrM (const (lift $ randomBoolM infectivity)) -< ()
-          if infected
+          isInfected <- arrM (const (lift $ randomBoolM infectivity)) -< ()
+          if isInfected
             then returnA -< (Infected, Event ())
             else returnA -< (Susceptible, NoEvent)
         _ -> returnA -< (Susceptible, NoEvent)
@@ -863,10 +879,10 @@ visualiseSimulation dt ctx0 = do
       (const $ return ())
 
   where
-    (cx, cy)   = agentGridSize
-    (wx, wy)   = winSize
-    cellWidth  = (fromIntegral wx / fromIntegral cx) :: Double
-    cellHeight = (fromIntegral wy / fromIntegral cy) :: Double
+    -- (cx, cy)   = agentGridSize
+    -- (wx, wy)   = winSize
+    -- cellWidth  = (fromIntegral wx / fromIntegral cx) :: Double
+    -- cellHeight = (fromIntegral wy / fromIntegral cy) :: Double
 
     nextFrame :: RandomGen g
               => IORef (SimCtx g)
@@ -994,7 +1010,7 @@ main = do
     else do
       let ts = [0.0, dt .. t]
       let ctxs = evaluateCtxs (length ts) dt ctx
-      -- exportPicturesToGif 10 LoopingForever (800, 800) GLO.white "SIR.gif" ((ctxToPic . (animation ctxs dt)) . uncurry encodeFloat . decodeFloat) (map (uncurry encodeFloat . decodeFloat) ts)
+      exportPicturesToGif 10 LoopingForever (800, 800) GLO.white "SIR.gif" ((ctxToPic . (animation ctxs dt)) . uncurry encodeFloat . decodeFloat) (map (uncurry encodeFloat . decodeFloat) ts)
       writeSimulationUntil t dt ctx "SIR_DUNAI_dt001.csv"
 \end{code}
 
@@ -1010,7 +1026,6 @@ decodeCSV  = decode NoHeader
 getResults :: IO ([(Int, Int)], [(Int, Int)], [(Int, Int)])
 getResults = do
     csvData <- BL.readFile "SIR_DUNAI_dt001.csv"
-    let x = decodeCSV csvData
     case decode HasHeader csvData of
         Left err -> error err
         Right y -> do let (a,b,c) = addToList y
@@ -1030,6 +1045,7 @@ scatterAxis2 (d, e, f) = r2Axis &~ do
     scatterPlot (map (\(x,y) -> (fromIntegral x, fromIntegral y)) e) $ key "I"
     scatterPlot (map (\(x,y) -> (fromIntegral x, fromIntegral y)) f) $ key "R"
 
+main1 :: IO ()
 main1 = do
   (d,e,f) <- getResults
   withArgs ["-odiagrams/BoardingSchool78.png"] (r2AxisMain $ scatterAxis2 (d, e, f))
