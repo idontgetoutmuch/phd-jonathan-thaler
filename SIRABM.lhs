@@ -40,7 +40,7 @@
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Main (main, main1, main', decodeCSV, runSimulationUntil, moore, neumann, whiteNoise, fallingMassMSF, fallingMass, fallingMass') where
+module Main (main, main1, mainDet, decodeCSV, runSimulationUntil, moore, neumann, fallingMass, fallingMass') where
 
 import           Data.IORef
 import           System.IO
@@ -191,92 +191,35 @@ fallingMass p0 v0 =
   integral >>>
   arr (+ p0)
 
-fallingMass' :: Monad m => Double -> Double -> MSF (ClockInfo m) Double Double
+fallingMass' :: Double -> Double ->
+                MSF (ClockInfo (StateT Int IO)) () Double
 fallingMass' p0 v0 = proc _ -> do
     v <- arr (+v0) <<< integral -< (-9.8)
     p <- arr (+p0) <<< integral -< v
+    arrM_ (lift $ modify (+1)) -< ()
+    arrM (liftIO . putStrLn) -< show p
     returnA -< p
-
-type FallingMassStack g = (StateT Int (RandT g IO))
-type FallingMassMSF g = SF (FallingMassStack g) () Double
-
-main' :: IO ()
-main' = do
-  let g0  = mkStdGen 42
-      s0  = 0
-      -- msf = fallingMassMSF 0 100
-      msf = whiteNoise
-  runMSF g0 s0 msf
-
-main'' :: IO ()
-main'' = do
-  let g0  = mkStdGen 1729
-      s0  = 0
-      msf = brownianMotion
-  runMSF g0 s0 msf
 
 arrM_ :: Monad m => m b -> MSF m a b
 arrM_ = arrM . const
 
-runMSF :: StdGen -> Int ->
-          MSF (ReaderT DTime (StateT Int (RandT StdGen IO))) () Double ->
-          IO ()
-runMSF g s msf = do
+runMSFDet :: Int ->
+             MSF (ReaderT DTime (StateT Int IO)) () Double ->
+             IO ()
+runMSFDet s msf = do
   let msfReaderT = unMSF msf ()
       msfStateT  = runReaderT msfReaderT 0.1
       msfRand    = runStateT msfStateT s
-      msfIO      = runRandT msfRand g
 
-  (((p, msf'), s'), g') <- msfIO
+  ((_p, msf'), s') <- msfRand
 
-  when (s' <= 1000) (runMSF g' s' msf')
+  when (s' <= 10) (runMSFDet s' msf')
 
-brownianMotion :: MSF (ReaderT DTime (StateT Int (RandT StdGen IO))) () Double
-brownianMotion = proc _ -> do
-  r1 <- arrM_ (lift $ lift $ getRandomR (0.0, 1.0)) -< ()
-  r2 <- arrM_ (lift $ lift $ getRandomR (0.0, 1.0)) -< ()
-  (n1, _) <- arr f -< (r1, r2)
-  arrM_ (lift $ modify (+1)) -< ()
-  bm <- integral -< n1
-  arrM (liftIO . putStrLn) -< show bm
-  returnA -< bm
-  where
-    f (u1, u2) = ( sqrt ((-2) * log u1) * (cos (2 * pi * u2))
-                 , sqrt ((-2) * log u1) * (sin (2 * pi * u2)))
-
-whiteNoise :: RandomGen g => FallingMassMSF g
-whiteNoise = proc _ -> do
-  r1 <- arrM_ (lift $ lift $ getRandomR (0.0, 1.0)) -< ()
-  r2 <- arrM_ (lift $ lift $ getRandomR (0.0, 1.0)) -< ()
-  (n1, _) <- arr f -< (r1, r2)
-  s <- arrM_ (lift get) -< ()
-  -- arrM (liftIO . putStrLn) -< "n1 = " ++ show n1 ++ ", s = " ++ show s
-  arrM_ (lift $ modify (+1)) -< ()
-  bm <- integral -< n1
-  arrM (liftIO . putStrLn) -< show bm
-  returnA -< bm
-  where
-    f (u1, u2) = ( sqrt ((-2) * log u1) * (cos (2 * pi * u2))
-                 , sqrt ((-2) * log u1) * (sin (2 * pi * u2)))
-
-
-fallingMassMSF :: RandomGen g
-               => Double -> Double -> FallingMassMSF g
-fallingMassMSF v0 p0 = proc _ -> do
-  r <- arrM_ (lift $ lift $ getRandomR (0, 9.81)) -< ()
-  arrM (liftIO . putStrLn) -< "r = " ++ show r
-
-  v <- arr (+v0) <<< integral -< (-r)
-  p <- arr (+p0) <<< integral -< v
-
-  arrM_ (lift $ modify (+1)) -< ()
-
-  if p > 0
-    then returnA -< p
-    else do
-      s <- arrM_ (lift get) -< ()
-      arrM (liftIO . putStrLn) -< "hit floor with v " ++ show v ++ " after " ++ show s ++ " steps"
-      returnA -< p
+mainDet :: IO ()
+mainDet = do
+  let s0  = 0
+      msf = fallingMass' 100 0
+  runMSFDet s0 msf
 \end{code}
 
 \section{SIR model using Functional Reactive Programming}
