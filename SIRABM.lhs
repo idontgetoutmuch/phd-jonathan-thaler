@@ -220,6 +220,38 @@ mainDet = do
   let s0  = 0
       msf = fallingMass' 100 0
   runMSFDet s0 msf
+
+runStep :: DTime ->
+           ((Double, MSF (ReaderT DTime (StateT Int IO)) () Double), Int) ->
+           IO ((Double, MSF (ReaderT DTime (StateT Int IO)) () Double), Int)
+runStep dt ((t, msf), n) = msfRand
+  where
+    sfReader = unMSF msf ()
+    sfRand   = runReaderT sfReader dt
+    msfRand  =  runStateT sfRand n
+
+visualiseSimulation2 :: DTime
+                     -> ((Double, MSF (ReaderT DTime (StateT Int IO)) () Double), Int)
+                     -> IO ()
+visualiseSimulation2 dt ((p, msf), n) = do
+  ctxRef <- newIORef ((p, msf), n)
+  GLOAnim.animateIO (GLO.InWindow "foo" (800, 800) (0, 0))
+                    GLO.blue
+                    (nextFrame ctxRef)
+                    (const $ return ())
+  where
+    nextFrame :: IORef ((Double, MSF (ReaderT DTime (StateT Int IO)) () Double), Int)
+              -> Float
+              -> IO GLO.Picture
+    nextFrame ctxRef _ = do
+      ((p, msf), n) <- readIORef ctxRef
+      putStrLn $ show p
+      ctx' <- runStep dt ((p, msf), n)
+      writeIORef ctxRef ctx'
+      return $ GLOAnim.translate 0.0 (fromRational $ toRational p) (GLOAnim.thickCircle 10.0 100.0)
+
+main :: IO ()
+main = visualiseSimulation2 0.1 ((10.0, bouncingBall 100.0 0.0), 0)
 \end{code}
 
 The only other combinator we will need to show how to create an ABM is |switch
@@ -967,8 +999,8 @@ steps and enables a method of getting output either through an animation
 or through a CSV file output and a GIF of the animation.
 
 \begin{code}
-main :: IO ()
-main = do
+main2 :: IO ()
+main2 = do
   hSetBuffering stdout NoBuffering
 
   let visualise = False
