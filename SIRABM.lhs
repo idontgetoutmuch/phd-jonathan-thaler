@@ -222,6 +222,40 @@ mainDet = do
   runMSFDet s0 msf
 \end{code}
 
+The only other combinator we will need to show how to create an ABM is |switch
+  :: Monad m => SF m a (b, Event c) -> (c -> SF m a b) -> SF m a b|. An |Event| is defined as |data Event a = NoEvent || Event a|. |switch| takes
+
+\begin{enumerate}
+
+\item
+A time-varying process, the output of which is pair with the second element of this pair either returning |NoEvent| or returning |Event x| (for some |x| of type |c|).
+
+\item
+A function which takes a value of type |c| and returns a time-varying process.
+
+\end{enumerate}
+
+In the event (pun intended) of |NoEvent|, |switch| returns the first time-varying process (without the event information); if there is an event then |switch| applies the function that is the second argument and returns the time-varying process so created.
+
+Let us modify our example of a falling object to create a bouncing ball.
+
+\begin{code}
+bouncingBall :: Monad m => Double -> Double -> SF m () Double
+bouncingBall p0 v0 =
+  switch (fallingBall p0 v0 >>> (arr fst &&& hitFloor))
+         (\(p,v) -> bouncingBall p (-v))
+
+fallingBall :: Monad m => Double -> Double -> SF m () (Double,Double)
+fallingBall p0 v0 = proc () -> do
+  v <- arr (v0+) <<< integral -< (-9.8)
+  p <- arr (p0+) <<< integral -< v
+  returnA -< (p,v)
+
+hitFloor :: Monad m => SF m (Double,Double) (Event (Double,Double))
+hitFloor = arr $ \(p,v) ->
+  if p < 0 && v < 0 then Event (p,v) else noEvent
+\end{code}
+
 \section{SIR model using Functional Reactive Programming}
 
 The goal is to use a Functional Reactive Programming (FRP) approach in
