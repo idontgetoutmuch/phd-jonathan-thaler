@@ -344,23 +344,15 @@ store their location coordinate and their state in an array.\unsure[inline]{I th
 type SIREnv       = Array Disc2dCoord SIRState
 \end{code}
 
-Next, to aid readability, we define a type synonym for `Rand` monad
-which allows us to obtain random numbers parameterised over the random
-number generator `g`
-
-\begin{code}
-type SIRMonad g   = Rand g
-\end{code}
-
 \subsection{Define the SIR Agent}
 
 \textit{SIRAgent} is used to define Agents as Signal functions which receives
 the SIR states of all agents as input and outputs the current SIR state
-of the agent. It also returns the output in a \textit{SIRMonad} context - which
+of the agent. It also returns the output in a \textit{Rand} context - which
 is building the monad over a rand monad.
 
 \begin{code}
-type SIRAgent g = SF (SIRMonad g) SIREnv SIRState
+type SIRAgent g = SF (Rand g) SIREnv SIRState
 \end{code}
 
 \textit{SimSF} type is similar to \textit{SIRagent} above, however it does not receive
@@ -369,7 +361,7 @@ This is useful in instances where states of neighbours must be accessed
 by an agent to determine whether infection occurs.
 
 \begin{code}
-type SimSF g = SF (SIRMonad g) () SIREnv
+type SimSF g = SF (Rand g) () SIREnv
 \end{code}
 
 \subsection{Defining simulation context}
@@ -452,7 +444,7 @@ infected depending on its proximity to a possibly infected agent.
 
 \begin{code}
 susceptible :: RandomGen g
-            => Disc2dCoord -> SF (SIRMonad g) SIREnv (SIRState, Event ())
+            => Disc2dCoord -> SF (Rand g) SIREnv (SIRState, Event ())
 susceptible coord = proc env -> do
   makeContact <- occasionally (1 / contactRate) () -< ()
   if not (isEvent makeContact)
@@ -488,7 +480,7 @@ behaviour is governed by either recovering on average after delta time
 units or staying infected within a timestep.
 
 \begin{code}
-infected :: RandomGen g => SF (SIRMonad g) SIREnv (SIRState, Event ())
+infected :: RandomGen g => SF (Rand g) SIREnv (SIRState, Event ())
 infected = proc _ -> do
   recovered <- occasionally illnessDuration () -< ()
   if isEvent recovered
@@ -765,7 +757,7 @@ by the associations in the right argument.
 simulationStep :: RandomGen g
                => [(SIRAgent g, Disc2dCoord)]
                -> SIREnv
-               -> SF (SIRMonad g) () SIREnv
+               -> SF (Rand g) () SIREnv
 simulationStep sfsCoords env = MSF $ \_ -> do
   let (sfs, coords) = unzip sfsCoords
   ret <- mapM (`unMSF` env) sfs
