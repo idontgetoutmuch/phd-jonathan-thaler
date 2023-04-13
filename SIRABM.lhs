@@ -436,24 +436,6 @@ susceptible (no event).
 
 \improvement[inline]{I think we need to say something about the arrow notation here. I think \textit{proc} and \textit{-<} is something like the monadic do notation so that you can avoid using point-free style which can be quite hard to read - so it is syntactic sugar}
 
-\unsure[inline]{I would expect a poisson process here but afaics \textit{occasionally} does not do that --- I think we used an exponential distribution in our previous model?}
-
-\info[inline]{Here's what we had in Julia}
-
-\begin{verbatim}
-function transmit!(agent, model)
-    agent.status != :S && return
-    ncontacts = rand(Poisson(model.properties[:c]))
-    for i in 1:ncontacts
-        alter = random_agent(model)
-        if alter.status == :I && (rand() <= model.properties[:β])
-            agent.status = :J
-            break
-        end
-    end
-end;
-\end{verbatim}
-
 \improvement[inline]{Now that I have thought about it for a bit longer, maybe we should just leave the code as it is but with a footnote or aside to say that we should really use a Poisson distribution}
 
 \change[inline]{I removed this comment: -- use occasionally to make contact on average}
