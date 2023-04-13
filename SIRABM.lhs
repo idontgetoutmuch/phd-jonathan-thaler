@@ -183,7 +183,10 @@ essential due to their time-dependent nature (see more
 Futher reading on FRP concepts can be found \href{https://ivanperez.io/papers/2016-HaskellSymposium-Perez-Barenz-Nilsson-FRPRefactored-short.pdf}{here}.
 
 \begin{code}
-fallingMass :: Monad m => Double -> Double -> MSF (ClockInfo m) Void Double
+type Pos = Double
+type Vel = Double
+
+fallingMass :: Monad m => Pos -> Vel -> MSF (ClockInfo m) Void Pos
 fallingMass p0 v0 =
   arr (const (-9.81)) >>>
   integral >>>
@@ -191,14 +194,28 @@ fallingMass p0 v0 =
   integral >>>
   arr (+ p0)
 
-fallingMass' :: Double -> Double ->
-                MSF (ClockInfo (StateT Int IO)) () Double
+fallingMass' :: Pos -> Vel ->
+                MSF (ClockInfo (StateT Int IO)) () Pos
 fallingMass' p0 v0 = proc _ -> do
     v <- arr (+v0) <<< integral -< (-9.8)
     p <- arr (+p0) <<< integral -< v
     arrM_ (lift $ modify (+1)) -< ()
     arrM (liftIO . putStrLn) -< show p
     returnA -< p
+
+fallingBall :: Monad m => Double -> Double -> SF m () (Double,Double)
+fallingBall p0 v0 = proc () -> do
+  v <- arr (v0+) <<< integral -< (-9.8)
+  p <- arr (p0+) <<< integralLinear v0 -< v
+  returnA -< (p,v)
+
+\end{code}
+
+%if style == newcode
+\begin{code}
+integralLinear initial = average >>> integral
+  where
+    average = (arr id &&& iPre initial) >>^ (\(x, y) -> (x ^+^ y) ^/ 2)
 
 arrM_ :: Monad m => m b -> MSF m a b
 arrM_ = arrM . const
@@ -253,9 +270,9 @@ visualiseSimulation2 dt ((p, msf), n) = do
 main :: IO ()
 main = visualiseSimulation2 0.1 ((10.0, bouncingBall 100.0 0.0), 0)
 \end{code}
+%endif
 
-The only other combinator we will need to show how to create an ABM is |switch
-  :: Monad m => SF m a (b, Event c) -> (c -> SF m a b) -> SF m a b|. An |Event| is defined as |data Event a = NoEvent || Event a|. |switch| takes
+We will need a few more combinators to show how to create an ABM, the first of which is |switch :: Monad m => SF m a (b, Event c) -> (c -> SF m a b) -> SF m a b|. An |Event| is defined as |data Event a = NoEvent || Event a|. |switch| takes
 
 \begin{enumerate}
 
@@ -272,16 +289,23 @@ In the event (pun intended) of |NoEvent|, |switch| returns the first time-varyin
 Let us modify our example of a falling object to create a bouncing ball.
 
 \begin{code}
+fallingBall' :: Monad m => Pos -> Vel -> SF m () ((Pos,Vel), Event (Pos,Vel))
+fallingBall' p0 v0 = proc () -> do
+  pv@(p, _) <- fallingBall p0 v0 -< ()
+  hit <- edge -< p <= 0
+  returnA -< (pv, hit `tag` pv)
+
+bouncingBall' :: Monad m => Pos -> SF m () (Pos, Vel)
+bouncingBall' p0 = bbRec p0 0.0
+  where
+    bbRec p0 v0 =
+      switch (fallingBall' p0 v0) $ \(p,v) ->
+      bbRec p (-v)
+
 bouncingBall :: Monad m => Double -> Double -> SF m () Double
 bouncingBall p0 v0 =
   switch (fallingBall p0 v0 >>> (arr fst &&& hitFloor))
          (\(p,v) -> bouncingBall p (-v))
-
-fallingBall :: Monad m => Double -> Double -> SF m () (Double,Double)
-fallingBall p0 v0 = proc () -> do
-  v <- arr (v0+) <<< integral -< (-9.8)
-  p <- arr (p0+) <<< integral -< v
-  returnA -< (p,v)
 
 hitFloor :: Monad m => SF m (Double,Double) (Event (Double,Double))
 hitFloor = arr $ \(p,v) ->
