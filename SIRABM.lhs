@@ -40,7 +40,7 @@
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Main (main, main1, mainDet, decodeCSV, runSimulationUntil, moore, neumann, fallingMass, fallingMass') where
+module Main (main, main1, decodeCSV, runSimulationUntil, moore, neumann, fallingBall, fallingBall') where
 
 import           Data.IORef
 import           System.IO
@@ -186,23 +186,6 @@ Futher reading on FRP concepts can be found \href{https://ivanperez.io/papers/20
 type Pos = Double
 type Vel = Double
 
-fallingMass :: Monad m => Pos -> Vel -> MSF (ClockInfo m) Void Pos
-fallingMass p0 v0 =
-  arr (const (-9.81)) >>>
-  integral >>>
-  arr (+ v0) >>>
-  integral >>>
-  arr (+ p0)
-
-fallingMass' :: Pos -> Vel ->
-                MSF (ClockInfo (StateT Int IO)) () Pos
-fallingMass' p0 v0 = proc _ -> do
-    v <- arr (+v0) <<< integral -< (-9.8)
-    p <- arr (+p0) <<< integral -< v
-    arrM_ (lift $ modify (+1)) -< ()
-    arrM (liftIO . putStrLn) -< show p
-    returnA -< p
-
 fallingBall :: Monad m => Double -> Double -> SF m () (Double,Double)
 fallingBall p0 v0 = proc () -> do
   v <- arr (v0+) <<< integral -< (-9.8)
@@ -231,12 +214,6 @@ runMSFDet s msf = do
   ((_p, msf'), s') <- msfRand
 
   when (s' <= 10) (runMSFDet s' msf')
-
-mainDet :: IO ()
-mainDet = do
-  let s0  = 0
-      msf = fallingMass' 100 0
-  runMSFDet s0 msf
 
 runStep :: DTime ->
            ((Double, MSF (ReaderT DTime (StateT Int IO)) () Double), Int) ->
@@ -332,21 +309,6 @@ The following sections describe the approach taken to achieve the above
 trend using a FRP approach in Haskell.
 
 \section{Setting up SIR simulation using Haskell}
-
-\subsection{Language Extensions}
-
-Language extensions are used to enable certain features in Haskell. In
-this case, we require the following features: - `Arrows` : to support
-the arrow notations - `Strict` : to allows functions parameters to be
-evaluated before calls - `FlexibleContexts` : loosens restrictions on
-what constraints can be used in a typeclass
-
-\subsection{Loading Modules}
-
-Various modules required for the different aspect of simulation must be
-loaded.
-
-
 
 \subsection{SIR States as a Algebraic Data Type}
 
