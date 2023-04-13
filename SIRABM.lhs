@@ -204,7 +204,7 @@ arrM_ :: Monad m => m b -> MSF m a b
 arrM_ = arrM . const
 
 runMSFDet :: Int ->
-             MSF (ReaderT DTime (StateT Int IO)) () Double ->
+             SF (StateT Int IO) () Double ->
              IO ()
 runMSFDet s msf = do
   let msfReaderT = unMSF msf ()
@@ -216,8 +216,8 @@ runMSFDet s msf = do
   when (s' <= 10) (runMSFDet s' msf')
 
 runStep :: DTime ->
-           ((Double, MSF (ReaderT DTime (StateT Int IO)) () Double), Int) ->
-           IO ((Double, MSF (ReaderT DTime (StateT Int IO)) () Double), Int)
+           ((Double, SF (StateT Int IO) () Double), Int) ->
+           IO ((Double, SF (StateT Int IO) () Double), Int)
 runStep dt ((t, msf), n) = msfRand
   where
     sfReader = unMSF msf ()
@@ -225,7 +225,7 @@ runStep dt ((t, msf), n) = msfRand
     msfRand  =  runStateT sfRand n
 
 visualiseSimulation2 :: DTime
-                     -> ((Double, MSF (ReaderT DTime (StateT Int IO)) () Double), Int)
+                     -> ((Double, SF (StateT Int IO) () Double), Int)
                      -> IO ()
 visualiseSimulation2 dt ((p, msf), n) = do
   ctxRef <- newIORef ((p, msf), n)
@@ -234,7 +234,7 @@ visualiseSimulation2 dt ((p, msf), n) = do
                     (nextFrame ctxRef)
                     (const $ return ())
   where
-    nextFrame :: IORef ((Double, MSF (ReaderT DTime (StateT Int IO)) () Double), Int)
+    nextFrame :: IORef ((Double, SF (StateT Int IO) () Double), Int)
               -> Float
               -> IO GLO.Picture
     nextFrame ctxRef _ = do
