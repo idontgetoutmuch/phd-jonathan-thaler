@@ -66,7 +66,7 @@ import Plots.Axis  (Axis, r2Axis)
 import Diagrams.Backend.Cairo (B)
 import IHaskell.Display.Diagrams ()
 import Plots (scatterPlot, key, r2AxisMain, Plotable, addPlotable', linePlot')
-import Diagrams.Prelude hiding (Time, (^/), (^+^))
+import Diagrams.Prelude hiding (Time, (^/), (^+^), trace)
 import System.Environment
 
 import qualified Data.ByteString.Lazy as BL
@@ -74,6 +74,8 @@ import Data.Csv
 import qualified Data.Vector as V
 
 import Control.Monad.State
+
+import Debug.Trace
 \end{code}
 %endif
 
@@ -193,11 +195,12 @@ velocity then integrate the velocity and add the starting velocity.
 type Pos = Double
 type Vel = Double
 
-fallingBall1 :: Monad m => Pos -> Vel -> SF m () (Pos, Vel)
+fallingBall1 :: MonadState Int m => Pos -> Vel -> SF m () (Pos, Vel)
 fallingBall1 p0 v0 = proc () -> do
   let g = -9.81
   v <- arr (\x -> v0 + x) <<< integral -< g
   p <- arr (\y -> p0 + y) <<< integral -< v
+  arrM_ (lift (modify (+1))) -< ()
   returnA -< (p,v)
 \end{code}
 
@@ -212,15 +215,11 @@ Figure~\ref{fig:fallingBall} shows the execution of such a process.
 
 %if style == newcode
 \begin{code}
-preMorePts :: [(Double, Double)]
-preMorePts = runMSFDet' 0 (fallingBall1 10 10)
 
 main3 :: IO ()
 main3 = do
-  withArgs ["-odiagrams/fallingBall.png"] (r2AxisMain jSaxis)
-
-morePts :: [P2 Double]
-morePts = map p2 $ preMorePts
+  withArgs ["-odiagrams/fallingBall.png"] (r2AxisMain (jSaxis (fallingBall1 10 10)))
+  withArgs ["-odiagrams/bouncingBall.png"] (r2AxisMain (jSaxis (bouncingBall 10 10)))
 
 addPoint :: (Plotable (Diagram B) b, MonadState (Axis b V2 Double) m) =>
             Double -> (Double, Double) -> m ()
@@ -230,19 +229,26 @@ addPoint o (x, y) = addPlotable'
                      opacity o #
                      translate (r2 (x, y)))
 
-jSaxis :: Axis B V2 Double
-jSaxis = r2Axis &~ do
+jSaxis :: SF (StateT Int (WriterT [(Double, Double)] Identity)) () (Double, Double)
+       -> Axis B V2 Double
+jSaxis msf = r2Axis &~ do
+  let preMorePts = runMSFDet' 0 msf
+  let morePts = map p2 $ preMorePts
   let l = length preMorePts
   let os = [0.05,0.1..]
   let ps = take (l `div` 4) [0,4..]
   zipWithM_ addPoint os (map (preMorePts!!) ps)
   linePlot' $ map unp2 $ take 200 morePts
 
-fallingBall :: Monad m => Pos -> Vel -> SF m () (Pos, Vel)
+arrM_ :: Monad m => m b -> MSF m a b
+arrM_ = arrM . const
+
+fallingBall :: MonadState Int m => Pos -> Vel -> SF m () (Pos, Vel)
 fallingBall p0 v0 = proc () -> do
   let g = -9.81
   v <- arr (\x -> v0 + x) <<< integral -< g
   p <- arr (\y -> p0 + y) <<< integralLinear v0 -< v
+  arrM_ (lift (modify (+1))) -< ()
   returnA -< (p,v)
 
 integralLinear :: Monad m => Double -> SF m Double Double
@@ -258,9 +264,11 @@ runMSFDet s msf = do
       msfStateT  = runReaderT msfReaderT 0.1
       msfRand    = runStateT msfStateT s
 
-  ((_p, msf'), s') <- msfRand
+  ((p, msf'), s') <- msfRand
 
-  when (s' <= 10) (runMSFDet s' msf')
+  putStrLn $ show p
+
+  when (p >= 100) (runMSFDet s' msf')
 
 runMSFDet' :: Int ->
               SF (StateT Int (WriterT [(Double, Double)] Identity)) () (Double, Double) ->
@@ -273,7 +281,7 @@ runMSFDet' s msf = snd $ runWriter (runMSFDetAux s msf)
           msfRand    = runStateT msfStateT s
       ((p, msf'), s') <- msfRand
       tell [p]
-      when (fst p >= 0.0) (runMSFDetAux s' msf')
+      when (s' <= 100) (runMSFDetAux s' msf')
 
 runStep :: DTime ->
            ((Double, SF (StateT Int IO) () Double), Int) ->
@@ -305,7 +313,7 @@ visualiseSimulation2 dt ((p, msf), n) = do
       return $ GLOAnim.translate 0.0 (fromRational $ toRational p) (GLOAnim.thickCircle 10.0 100.0)
 
 main :: IO ()
-main = visualiseSimulation2 0.1 ((10.0, bouncingBall 100.0 0.0), 0)
+main = visualiseSimulation2 0.1 ((10.0, (bouncingBall 100.0 0.0 >>> arr fst)), 0)
 \end{code}
 %endif
 
@@ -326,28 +334,37 @@ In the event (pun intended) of |NoEvent|, |switch| returns the first time-varyin
 Let us modify our example of a falling object to create a bouncing ball.
 
 \begin{code}
-fallingBall' :: Monad m => Pos -> Vel -> SF m () ((Pos,Vel), Event (Pos,Vel))
+fallingBall' :: MonadState Int m => Pos -> Vel -> SF m () ((Pos,Vel), Event (Pos,Vel))
 fallingBall' p0 v0 = proc () -> do
   pv@(p, _) <- fallingBall p0 v0 -< ()
   hit <- edge -< p <= 0
   returnA -< (pv, hit `tag` pv)
 
-bouncingBall' :: Monad m => Pos -> SF m () (Pos, Vel)
+bouncingBall' :: MonadState Int m => Pos -> SF m () (Pos, Vel)
 bouncingBall' p0 = bbRec p0 0.0
   where
     bbRec p0 v0 =
       switch (fallingBall' p0 v0) $ \(p,v) ->
       bbRec p (-v)
 
-bouncingBall :: Monad m => Double -> Double -> SF m () Double
+bouncingBall :: MonadState Int m => Double -> Double -> SF m () (Double, Double)
 bouncingBall p0 v0 =
-  switch (fallingBall p0 v0 >>> (arr fst &&& hitFloor))
+  switch (fallingBall p0 v0 >>> (arr id &&& hitFloor))
          (\(p,v) -> bouncingBall p (-v))
 
 hitFloor :: Monad m => SF m (Double,Double) (Event (Double,Double))
 hitFloor = arr $ \(p,v) ->
   if p < 0 && v < 0 then Event (p,v) else noEvent
 \end{code}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{diagrams/bouncingBall.png}
+    \caption{Bouncing Ball}
+    \label{fig:bouncingBall}
+\end{figure}
+
+Figure~\ref{fig:bouncingBall} shows the execution of such a process.
 
 \section{SIR model using Functional Reactive Programming}
 
