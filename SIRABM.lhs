@@ -40,7 +40,7 @@
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Main (main, main1, decodeCSV, runSimulationUntil, moore, neumann, fallingBall, fallingBall') where
+module Main (main, main1, main2, main3, decodeCSV, runSimulationUntil, moore, neumann, fallingBall, fallingBall') where
 
 import           Data.IORef
 import           System.IO
@@ -48,6 +48,7 @@ import           Text.Printf
 
 import           Control.Monad.Random
 import           Control.Monad.Reader
+import           Control.Monad.Writer
 import           Control.Monad.Trans.MSF.Random
 
 import           Data.Array.IArray
@@ -62,11 +63,10 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Csv             as Csv
 import Plots.Axis  (Axis, r2Axis)
 
-import Control.Lens ((&~))
 import Diagrams.Backend.Cairo (B)
-import Diagrams.TwoD.Types (V2)
 import IHaskell.Display.Diagrams ()
-import Plots (scatterPlot, key, r2AxisMain)
+import Plots (scatterPlot, key, r2AxisMain, Plotable, addPlotable', linePlot')
+import Diagrams.Prelude hiding (Time, (^/), (^+^))
 import System.Environment
 
 import qualified Data.ByteString.Lazy as BL
@@ -74,7 +74,6 @@ import Data.Csv
 import qualified Data.Vector as V
 
 import Control.Monad.State
-import Data.Void
 \end{code}
 %endif
 
@@ -95,9 +94,11 @@ actual data not the output of our model}
     \label{fig:boardingSchool1978}
 \end{figure}
 
-\citeauthor{RSPSA1927:115}~\cite{RSPSA1927:115} give a simple model of the spread of an infectious
-disease using ordinary differential equations. Individuals move from
-being susceptible ($S$) to infected ($I$) to recovered ($R$).
+In \cite{RSPSA1927:115},
+\citeauthor{RSPSA1927:115}~(\citedate{RSPSA1927:115}) give a simple
+model of the spread of an infectious disease using ordinary
+differential equations. Individuals move from being susceptible ($S$)
+to infected ($I$) to recovered ($R$).
 
 An alternative to modelling via differential equations is to use an
 agent-based model (ABM), a computational model which uses a bottom-up
@@ -148,6 +149,22 @@ c| and returns a time-varying value denoted |MSF m b c|. The reader
 can safely ignore the |m| and the constraint |Monad m| on the left
 hand side of the |=>|.\improvement{Why are they there though?}
 
+These signals can be composed directly or by composing
+signal functions. FRP libaries generally use arrows to implement
+functionality rather than monads due to greater efficiency and
+modularity. Arrows are a superset of monads, hence have very similar
+uses but are more restrictive (see~\cite{HEUNEN2006219} for more on arrows vs monads).
+
+The central concept of arrowised FRP is the Signal Function (SF). The SF
+represents a process overtime which maps an input signal to an output
+signal. Thus, signifying that SFs have an awareness of the passing of
+time through the timestep of the system\unsure[inline]{I don't know what you are trying to say here}. This concept of using
+time-varying functions as a method of handling agent-based models is
+essential due to their time-dependent nature (see more
+\href{https://www.cs.yale.edu/publications/techreports/tr1049.pdf}{here}.
+
+Futher reading on FRP concepts can be found \href{https://ivanperez.io/papers/2016-HaskellSymposium-Perez-Barenz-Nilsson-FRPRefactored-short.pdf}{here}.
+
 \begin{figure}
 \[
 \input{arrOperator.tex}
@@ -166,42 +183,72 @@ These time-varying process can be composed together using the |>>>| operator: |(
 \label{fig-rararaOperator}
 \end{figure}
 
-These signals can be composed directly or by composing
-signal functions. FRP libaries generally use arrows to implement
-functionality rather than monads due to greater efficiency and
-modularity. Arrows are a superset of monads, hence have very similar
-uses but are more restrictive (see~\cite{HEUNEN2006219} for more on arrows vs monads).
+An example should clarify how such combinators can be used to describe an agent. A falling ball is an object which falls under gravity starting parameterised by a starting position and velocity. This time-varying process takes no input (the only value of type |()| is |()|) and produces a signal (a time-varying value) of the ball's position and velocity.
 
-The central concept of arrowised FRP is the Signal Function (SF). The SF
-represents a process overtime which maps an input signal to an output
-signal. Thus, signifying that SFs have an awareness of the passing of
-time through the timestep of the system\unsure[inline]{I don't know what you are trying to say here}. This concept of using
-time-varying functions as a method of handling agent-based models is
-essential due to their time-dependent nature (see more
-[here](https://www.cs.yale.edu/publications/techreports/tr1049.pdf)).
-
-Futher reading on FRP concepts can be found \href{https://ivanperez.io/papers/2016-HaskellSymposium-Perez-Barenz-Nilsson-FRPRefactored-short.pdf}{here}.
+We can read the code below as take the accelaration (here
+gravitational constant $g$), integrate it and add the starting
+velocity then integrate the velocity and add the starting velocity.
 
 \begin{code}
 type Pos = Double
 type Vel = Double
 
-fallingBall :: Monad m => Double -> Double -> SF m () (Double,Double)
-fallingBall p0 v0 = proc () -> do
-  v <- arr (v0+) <<< integral -< (-9.8)
-  p <- arr (p0+) <<< integralLinear v0 -< v
+fallingBall1 :: Monad m => Pos -> Vel -> SF m () (Pos, Vel)
+fallingBall1 p0 v0 = proc () -> do
+  let g = -9.81
+  v <- arr (\x -> v0 + x) <<< integral -< g
+  p <- arr (\y -> p0 + y) <<< integral -< v
   returnA -< (p,v)
-
 \end{code}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{diagrams/fallingBall.png}
+    \caption{Falling Ball}
+    \label{fig:fallingBall}
+\end{figure}
+
+Figure~\ref{fig:fallingBall} shows the execution of such a process.
 
 %if style == newcode
 \begin{code}
+preMorePts :: [(Double, Double)]
+preMorePts = runMSFDet' 0 (fallingBall1 10 10)
+
+main3 :: IO ()
+main3 = do
+  withArgs ["-odiagrams/fallingBall.png"] (r2AxisMain jSaxis)
+
+morePts :: [P2 Double]
+morePts = map p2 $ preMorePts
+
+addPoint :: (Plotable (Diagram B) b, MonadState (Axis b V2 Double) m) =>
+            Double -> (Double, Double) -> m ()
+addPoint o (x, y) = addPlotable'
+                    ((circle 1e0 :: Diagram B) #
+                     fc brown #
+                     opacity o #
+                     translate (r2 (x, y)))
+
+jSaxis :: Axis B V2 Double
+jSaxis = r2Axis &~ do
+  let l = length preMorePts
+  let os = [0.05,0.1..]
+  let ps = take (l `div` 4) [0,4..]
+  zipWithM_ addPoint os (map (preMorePts!!) ps)
+  linePlot' $ map unp2 $ take 200 morePts
+
+fallingBall :: Monad m => Pos -> Vel -> SF m () (Pos, Vel)
+fallingBall p0 v0 = proc () -> do
+  let g = -9.81
+  v <- arr (\x -> v0 + x) <<< integral -< g
+  p <- arr (\y -> p0 + y) <<< integralLinear v0 -< v
+  returnA -< (p,v)
+
+integralLinear :: Monad m => Double -> SF m Double Double
 integralLinear initial = average >>> integral
   where
     average = (arr id &&& iPre initial) >>^ (\(x, y) -> (x ^+^ y) ^/ 2)
-
-arrM_ :: Monad m => m b -> MSF m a b
-arrM_ = arrM . const
 
 runMSFDet :: Int ->
              SF (StateT Int IO) () Double ->
@@ -214,6 +261,19 @@ runMSFDet s msf = do
   ((_p, msf'), s') <- msfRand
 
   when (s' <= 10) (runMSFDet s' msf')
+
+runMSFDet' :: Int ->
+              SF (StateT Int (WriterT [(Double, Double)] Identity)) () (Double, Double) ->
+              [(Double, Double)]
+runMSFDet' s msf = snd $ runWriter (runMSFDetAux s msf)
+  where
+    runMSFDetAux s msf = do
+      let msfReaderT = unMSF msf ()
+          msfStateT  = runReaderT msfReaderT 0.1
+          msfRand    = runStateT msfStateT s
+      ((p, msf'), s') <- msfRand
+      tell [p]
+      when (fst p >= 0.0) (runMSFDetAux s' msf')
 
 runStep :: DTime ->
            ((Double, SF (StateT Int IO) () Double), Int) ->
