@@ -390,11 +390,11 @@ trend using a FRP approach in Haskell.
 \subsection{SIR States as a Algebraic Data Type}
 
 The main governing property of the agents within the SIR simulation is
-their state - which can be either Susceptible, Infected or Recovered.
+their state - which can be either |Susceptible|, |Infected| or |Recovered|.
 Here, these possible states are described as a Algebraic data type (ADT)
 to ensure ease of assignment later.
 
-Additionally, a deriving (Show, Eq) clause is used to ensure the
+Additionally, a deriving |(Show, Eq)| clause is used to ensure the
 complier automatically generates instances of the Eq and Show classes
 for the ADT.
 
@@ -404,8 +404,20 @@ data SIRState = Susceptible | Infected | Recovered deriving (Show, Eq)
 
 \subsection{Define 2D environment}
 
-In this model, a $N \times M$ grid is used to define the spatial aspect of the
-model. Here, the discrete 2D environment is defined with a tuple.\improvement[inline]{Something like: were this to be modelled via differential equations, we would have to use partial differential equations. With one time dimension and two spatial dimensions, such differential equations are amenable to numerical methods but if the dimensions were significantly higher then ABMs start to show their advantage.}
+For a bit more a challenge than a simple compartmental model, let us
+model each agent as being at fixed co-ordinates on a grid. By
+modifying how other agents on the grid could be infected, we can
+simulate how an epidemic could spread through a population spread over
+the grid. For example, we might model that agents can only be infected
+if they are in physical contact with an already infected agent.
+
+A $N \times M$ grid is used to define the spatial aspect of the
+model. Here, the discrete 2D environment is defined with a tuple. Were
+this to be modelled via differential equations, we would have to use
+partial differential equations. With one time dimension and two
+spatial dimensions, such differential equations are amenable to
+numerical methods but if the dimensions were significantly higher then
+ABMs start to show their advantage.
 
 \begin{code}
 type Disc2dCoord  = (Int, Int)
@@ -418,7 +430,7 @@ retrievable. Hence, the type `SIREnv` is defined to allow agents to
 store their location coordinate and their state in an array.\unsure[inline]{I think there must be an assumption that every position contains an agent and this agent is either Susceptible, Infected or Recovered. Do you agree? And if so, can we make this explicit?}
 
 \begin{code}
-type SIREnv       = Array Disc2dCoord SIRState
+type SIREnv = Array Disc2dCoord SIRState
 \end{code}
 
 \subsection{Define the SIR Agent}
@@ -502,8 +514,6 @@ them if a neighbour is infected or not.
 which is governed by querying the surrounding neighbours and either
 getting infected based on the parameter $\gamma$ (event generated) or staying
 susceptible (no event).
-
-\improvement[inline]{I think we need to say something about the arrow notation here. I think \textit{proc} and \textit{-<} is something like the monadic do notation so that you can avoid using point-free style which can be quite hard to read - so it is syntactic sugar}
 
 \improvement[inline]{Now that I have thought about it for a bit longer, maybe we should just leave the code as it is but with a footnote or aside to say that we should really use a Poisson distribution}
 
