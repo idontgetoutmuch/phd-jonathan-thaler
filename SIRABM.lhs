@@ -4,6 +4,9 @@
 %format -< = "\leftbroom"
 %format >>> = "\ggg"
 %format <<< = "\lll"
+%format contactRate = "\beta"
+%format infectivity = "\gamma"
+%format illnessDuration = "\delta"
 
 \usepackage[colorlinks]{hyperref}
 \usepackage[pdftex,dvipsnames]{xcolor}
@@ -76,6 +79,20 @@ import qualified Data.Vector as V
 import Control.Monad.State
 
 import Debug.Trace
+
+winSize :: (Int, Int)
+winSize = (800, 800)
+
+cx, cy, wx, wy :: Int
+(cx, cy)   = agentGridSize
+(wx, wy)   = winSize
+
+cellWidth, cellHeight :: Double
+cellWidth  = (fromIntegral wx / fromIntegral cx)
+cellHeight = (fromIntegral wy / fromIntegral cy)
+
+winTitle :: String
+winTitle = "Agent-Based SIR on 2D Grid"
 \end{code}
 %endif
 
@@ -482,12 +499,12 @@ Susceptible, Infected or Recovered at a particular time.
 population.
 
 \item People interact with each other on average with a given rate of
-$\beta$ per time-unit.
+|contactRate| per time-unit.
 
-\item People become infected with a given probability $\gamma$ when
+\item People become infected with a given probability |infectivity| when
 interacting with an infected person.
 
-\item When infected, a person recovers on average after $\delta$
+\item When infected, a person recovers on average after |illnessDuration|
 time-units.
 
 \item An infected person is immune to further infections (no
@@ -510,28 +527,45 @@ them if a neighbour is infected or not.
 
 \subsubsection{Susceptible Agents}
 
-\textit{susceptibleAgent} describes the behaviour of a susceptible agent ---
+|susceptibleAgent| describes the behaviour of a susceptible agent ---
 which is governed by querying the surrounding neighbours and either
-getting infected based on the parameter $\gamma$ (event generated) or staying
+getting infected based on the parameter |infectivity| (event generated) or staying
 susceptible (no event).
 
 \improvement[inline]{Now that I have thought about it for a bit longer, maybe we should just leave the code as it is but with a footnote or aside to say that we should really use a Poisson distribution}
 
 \change[inline]{I removed this comment: -- use occasionally to make contact on average}
 
-We use \textit{occasionally} to determine whether an agent could have
-contacted another agent within the average time period $1 /
-\beta$. Note that we are not using the Gillespie algorithm or, as is
-often used, a Poisson distribution to determine the number of other
-agents that would be infected. We allow this agent to be potentially
-infected depending on its proximity to a possibly infected agent.
+We use |occasionally :: MonadRandom m => Time -> b -> SF m a (Event
+b)| to determine whether an agent could have contacted another agent
+within the average time period |1 / contactRate|. The constraint
+|MonadRandom m| on the left hand side of |=>| can be ignored but we
+note that it is now |MonadRandom| rather than |Monad| which further
+restricts what |m| can be (|MonadRandom| is sub-class of
+|Monad|). |occasionally| then takes a time and a value and returns a
+time-varying process of type |SF m () Event ()|. So this process takes
+no input and returns something that is either |NoEvent| or after some
+(random) time |Event ()|. If the output is |NoEvent| then we return
+that this agent is still |Susceptible|.
+
+On the other hand if the agent did make contact then we select another
+agent randomly from its neighbours: if this other agent is infected
+then the original agent may become infected depending on a Bernoulli
+random variabl.
+
+Note that we are not using the Gillespie
+algorithm~\cite{doi:10.1021/j100540a008} or, as is often used, a
+Poisson distribution to determine the number of other agents that
+would be infected. We allow this agent to be potentially infected
+depending on its proximity to a possibly infected agent.
 
 \change[inline]{I removed these comments -- take env, the dimensions of grid and neighbourhood info -- let ns = neighbours env coord agentGridSize moore -- queries the environemtn for its neighbours - in this case appears to be all neighbours -- randomly selects one -- upon infection -- event returned which returns in switching into the infected agent SF (to behave as such)
 }
 
 \begin{code}
 susceptible :: RandomGen g
-            => Disc2dCoord -> SF (Rand g) SIREnv (SIRState, Event ())
+            => Disc2dCoord
+            -> SF (Rand g) SIREnv (SIRState, Event ())
 susceptible coord = proc env -> do
   makeContact <- occasionally (1 / contactRate) () -< ()
   if not (isEvent makeContact)
@@ -607,8 +641,8 @@ value of type |output|.
 \section{Whatever}
 
 To enforce the simulation rules, various simulation parameters are
-defined: the contact rate $\beta$, the infection rate $\gamma$,
-recovery rate $\delta$ and the grid size.
+defined: the contact rate |contactRate|, the infection rate |infectivity|,
+recovery rate |illnessDuration| and the grid size.
 
 \begin{code}
 contactRate :: Double
@@ -622,30 +656,6 @@ illnessDuration = 15.0
 
 agentGridSize :: (Int, Int)
 agentGridSize = (27, 28)
-\end{code}
-
-The outputs of the simulation will be a CSV file containing the data and
-an animation, hence parameters relevant to these are set.
-
-\begin{code}
--- window size for animation
-winSize :: (Int, Int)
-winSize = (800, 800)
-
--- parameters for gif
-cx, cy, wx, wy :: Int
-(cx, cy)   = agentGridSize
-(wx, wy)   = winSize
-
--- parameters for rendering agents
-cellWidth, cellHeight :: Double
-cellWidth  = (fromIntegral wx / fromIntegral cx)
-cellHeight = (fromIntegral wy / fromIntegral cy)
-
-
--- window title for animation
-winTitle :: String
-winTitle = "Agent-Based SIR on 2D Grid"
 \end{code}
 
 Defining helper functions for the simulation
