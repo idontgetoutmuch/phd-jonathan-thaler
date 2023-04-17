@@ -43,7 +43,7 @@
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Main (main, main1, main2, main3, decodeCSV, runSimulationUntil, moore, neumann, fallingBall, fallingBall') where
+module Main (main, main1, main2, main3, decodeCSV, runSimulationUntil, moore, neumann) where
 
 import           Data.IORef
 import           System.IO
@@ -69,7 +69,7 @@ import Plots.Axis  (Axis, r2Axis)
 import Diagrams.Backend.Cairo (B)
 import IHaskell.Display.Diagrams ()
 import Plots (scatterPlot, key, r2AxisMain, Plotable, addPlotable', linePlot')
-import Diagrams.Prelude hiding (Time, (^/), (^+^), trace)
+import Diagrams.Prelude hiding (Time, (^/), (^+^), trace, coords)
 import System.Environment
 
 import qualified Data.ByteString.Lazy as BL
@@ -273,29 +273,15 @@ integralLinear initial = average >>> integral
   where
     average = (arr id &&& iPre initial) >>^ (\(x, y) -> (x ^+^ y) ^/ 2)
 
-runMSFDet :: Int ->
-             SF (StateT Int IO) () Double ->
-             IO ()
-runMSFDet s msf = do
-  let msfReaderT = unMSF msf ()
-      msfStateT  = runReaderT msfReaderT 0.1
-      msfRand    = runStateT msfStateT s
-
-  ((p, msf'), s') <- msfRand
-
-  putStrLn $ show p
-
-  when (p >= 100) (runMSFDet s' msf')
-
 runMSFDet' :: Int ->
               SF (StateT Int (WriterT [(Double, Double)] Identity)) () (Double, Double) ->
               [(Double, Double)]
 runMSFDet' s msf = snd $ runWriter (runMSFDetAux s msf)
   where
-    runMSFDetAux s msf = do
-      let msfReaderT = unMSF msf ()
+    runMSFDetAux s0 msf0 = do
+      let msfReaderT = unMSF msf0 ()
           msfStateT  = runReaderT msfReaderT 0.1
-          msfRand    = runStateT msfStateT s
+          msfRand    = runStateT msfStateT s0
       ((p, msf'), s') <- msfRand
       tell [p]
       when (s' <= 100) (runMSFDetAux s' msf')
@@ -303,7 +289,7 @@ runMSFDet' s msf = snd $ runWriter (runMSFDetAux s msf)
 runStep :: DTime ->
            ((Double, SF (StateT Int IO) () Double), Int) ->
            IO ((Double, SF (StateT Int IO) () Double), Int)
-runStep dt ((t, msf), n) = msfRand
+runStep dt ((_t, msf), n) = msfRand
   where
     sfReader = unMSF msf ()
     sfRand   = runReaderT sfReader dt
@@ -323,9 +309,9 @@ visualiseSimulation2 dt ((p, msf), n) = do
               -> Float
               -> IO GLO.Picture
     nextFrame ctxRef _ = do
-      ((p, msf), n) <- readIORef ctxRef
-      putStrLn $ show p
-      ctx' <- runStep dt ((p, msf), n)
+      ((p0, msf0), n0) <- readIORef ctxRef
+      putStrLn $ show p0
+      ctx' <- runStep dt ((p0, msf0), n0)
       writeIORef ctxRef ctx'
       return $ GLOAnim.translate 0.0 (fromRational $ toRational p) (GLOAnim.thickCircle 10.0 100.0)
 
@@ -351,19 +337,6 @@ In the event (pun intended) of |NoEvent|, |switch| returns the first time-varyin
 Let us modify our example of a falling object to create a bouncing ball.
 
 \begin{code}
-fallingBall' :: MonadState Int m => Pos -> Vel -> SF m () ((Pos,Vel), Event (Pos,Vel))
-fallingBall' p0 v0 = proc () -> do
-  pv@(p, _) <- fallingBall p0 v0 -< ()
-  hit <- edge -< p <= 0
-  returnA -< (pv, hit `tag` pv)
-
-bouncingBall' :: MonadState Int m => Pos -> SF m () (Pos, Vel)
-bouncingBall' p0 = bbRec p0 0.0
-  where
-    bbRec p0 v0 =
-      switch (fallingBall' p0 v0) $ \(p,v) ->
-      bbRec p (-v)
-
 bouncingBall :: MonadState Int m => Double -> Double -> SF m () (Double, Double)
 bouncingBall p0 v0 =
   switch (fallingBall p0 v0 >>> (arr id &&& hitFloor))
@@ -521,7 +494,7 @@ them if a neighbour is infected or not.
 
 \end{itemize}
 
-\subsection{Simulation Parameters set up}
+\subsection{Agents}
 
 \info[inline]{I know we have to have this here in Python notebook but I think it would be better to explain how the agents get updated first - maybe we can even do this in the notebook by defining things but not running them}
 
@@ -559,13 +532,34 @@ Poisson distribution to determine the number of other agents that
 would be infected. We allow this agent to be potentially infected
 depending on its proximity to a possibly infected agent.
 
+Functions related to using RNG elements
+
+`drawRandomElemS` and `randomBoolM` are related to use of RNG elements
+in simulation. A specific example is `RandomBoolM` being used to draw a
+random Boolean to determine whether an infection occurs in the
+susceptibleAgent function.
+
+\begin{code}
+randomBoolSF :: RandomGen g => SF (Rand g) () Bool
+randomBoolSF = arrM (const (lift $ randomBoolM infectivity))
+  where
+    randomBoolM p = do r <- getRandomR (0, 1)
+                       return $ r <= p
+
+drawRandomElemS :: MonadRandom m => SF m [a] a
+drawRandomElemS = proc as -> do
+  r <- getRandomRS ((0, 1) :: (Double, Double)) -< ()
+  let len = length as
+  let idx = (fromIntegral len * r)
+  let a =  as !! (floor idx)
+  returnA -< a
+\end{code}
+
 \change[inline]{I removed these comments -- take env, the dimensions of grid and neighbourhood info -- let ns = neighbours env coord agentGridSize moore -- queries the environemtn for its neighbours - in this case appears to be all neighbours -- randomly selects one -- upon infection -- event returned which returns in switching into the infected agent SF (to behave as such)
 }
 
 \begin{code}
-susceptible :: RandomGen g
-            => Disc2dCoord
-            -> SF (Rand g) SIREnv (SIRState, Event ())
+susceptible :: Disc2dCoord -> SF (Rand StdGen) SIREnv (SIRState, Event ())
 susceptible coord = proc env -> do
   makeContact <- occasionally (1 / contactRate) () -< ()
   if not (isEvent makeContact)
@@ -575,7 +569,7 @@ susceptible coord = proc env -> do
       s <- drawRandomElemS -< ns
       case s of
         Infected -> do
-          isInfected <- arrM (const (lift $ randomBoolM infectivity)) -< ()
+          isInfected <- randomBoolSF -< ()
           if isInfected
             then returnA -< (Infected, Event ())
             else returnA -< (Susceptible, NoEvent)
@@ -587,7 +581,7 @@ transition from Susceptible to Recovered in one time step, not
 something we want to have in our model.
 
 \begin{code}
-susceptibleAgent :: RandomGen g => Disc2dCoord -> SIRAgent g
+susceptibleAgent :: Disc2dCoord -> SF (Rand StdGen) SIREnv SIRState
 susceptibleAgent coord
     = switch
       (susceptible coord >>> iPre (Susceptible, NoEvent))
@@ -601,7 +595,7 @@ behaviour is governed by either recovering on average after delta time
 units or staying infected within a timestep.
 
 \begin{code}
-infected :: RandomGen g => SF (Rand g) SIREnv (SIRState, Event ())
+infected :: ABMSF SIREnv (SIRState, Event ())
 infected = proc _ -> do
   recovered <- occasionally illnessDuration () -< ()
   if isEvent recovered
@@ -613,7 +607,9 @@ Again we delay the switching by 1 step, otherwise could make the
 transition from Susceptible to Recovered within time-step.
 
 \begin{code}
-infectedAgent :: RandomGen g => SIRAgent g
+type ABMSF a b = SF (Rand StdGen) a b
+
+infectedAgent :: ABMSF SIREnv SIRState
 infectedAgent
     = switch
       (infected >>> iPre (Infected, NoEvent))
@@ -626,7 +622,7 @@ Unlike the other states, the recovered state does not generate any event
 and rather just acts a sink which constantly returns Recovered.
 
 \begin{code}
-recoveredAgent :: RandomGen g => SIRAgent g
+recoveredAgent :: ABMSF SIREnv SIRState
 recoveredAgent = arr (const Recovered)
 \end{code}
 
@@ -754,26 +750,6 @@ bottomRightDelta :: Disc2dCoord
 bottomRightDelta  = ( 1,  1)
 \end{code}
 
-Functions related to using RNG elements
-
-`drawRandomElemS` and `randomBoolM` are related to use of RNG elements
-in simulation. A specific example is `RandomBoolM` being used to draw a
-random Boolean to determine whether an infection occurs in the
-susceptibleAgent function.
-
-\begin{code}
-randomBoolM :: RandomGen g => Double -> Rand g Bool
-randomBoolM p = getRandomR (0, 1) >>= (\r -> return $ r <= p)
-
-drawRandomElemS :: MonadRandom m => SF m [a] a
-drawRandomElemS = proc as -> do
-  r <- getRandomRS ((0, 1) :: (Double, Double)) -< ()
-  let len = length as
-  let idx = (fromIntegral len * r)
-  let a =  as !! (floor idx)
-  returnA -< a
-\end{code}
-
 Functions related to defining/governing agent behaviour
 
 Aspects related to the behaviour of agents are defined via the various
@@ -828,7 +804,7 @@ infected and recovered agents do not require this information.
  -- recovered agent ignores gen bc they stay immune
 
 \begin{code}
-sirAgent :: RandomGen g => Disc2dCoord -> SIRState -> SIRAgent g
+sirAgent :: Disc2dCoord -> SIRState -> SF (Rand StdGen) SIREnv SIRState
 sirAgent coord Susceptible = susceptibleAgent coord
 sirAgent _     Infected    = infectedAgent
 sirAgent _     Recovered   = recoveredAgent
