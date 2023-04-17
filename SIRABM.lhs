@@ -101,10 +101,9 @@ winTitle = "Agent-Based SIR on 2D Grid"
 In 1978, anonymous authors sent a
 note,\citetitle{bmj-influenza}~\cite{bmj-influenza}, to the British
 Medical Journal reporting an influenza outbreak in a boarding school
-in the north of England . The chart below shows the solution of the
+in the north of England . The chart below shows the evolution of the
 SIR (Susceptible, Infected, Record) model with parameters which give
-roughly the results observed in the school.\change{This should be the
-actual data not the output of our model}
+roughly the results observed in the school.
 
 \begin{figure}[h]
     \centering
@@ -540,13 +539,13 @@ random Boolean to determine whether an infection occurs in the
 susceptibleAgent function.
 
 \begin{code}
-randomBoolSF :: RandomGen g => SF (Rand g) () Bool
+randomBoolSF :: ABMSF () Bool
 randomBoolSF = arrM (const (lift $ randomBoolM infectivity))
   where
     randomBoolM p = do r <- getRandomR (0, 1)
                        return $ r <= p
 
-drawRandomElemS :: MonadRandom m => SF m [a] a
+drawRandomElemS :: ABMSF [a] a
 drawRandomElemS = proc as -> do
   r <- getRandomRS ((0, 1) :: (Double, Double)) -< ()
   let len = length as
@@ -559,7 +558,7 @@ drawRandomElemS = proc as -> do
 }
 
 \begin{code}
-susceptible :: Disc2dCoord -> SF (Rand StdGen) SIREnv (SIRState, Event ())
+susceptible :: Disc2dCoord -> ABMSF SIREnv (SIRState, Event ())
 susceptible coord = proc env -> do
   makeContact <- occasionally (1 / contactRate) () -< ()
   if not (isEvent makeContact)
@@ -581,7 +580,7 @@ transition from Susceptible to Recovered in one time step, not
 something we want to have in our model.
 
 \begin{code}
-susceptibleAgent :: Disc2dCoord -> SF (Rand StdGen) SIREnv SIRState
+susceptibleAgent :: Disc2dCoord -> ABMSF SIREnv SIRState
 susceptibleAgent coord
     = switch
       (susceptible coord >>> iPre (Susceptible, NoEvent))
