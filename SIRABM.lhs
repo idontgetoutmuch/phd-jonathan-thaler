@@ -129,11 +129,11 @@ is an expert.} The autonomous agents are assigned characteristics
 dynamics. Spatiality can also be added to simulations.
 
 Traditionally, ABM simulations are implemented as object-oriented
-programs due to the intuitive mapping of objects to agents. However,
-Functional Reactive Programming (which we explain below) can also be
-used as it can guarantee the reproducibility of the simulation at
-compile time and avoid specific run-time bugs - which cannot be
-achieved in traditional object-oriented languages such as C\#.\unsure{This doesn't sound quite right}
+programs as it is considered that intuitively the agents can be mapped
+to objects. However, Functional Reactive Programming (which we explain
+below) can also be used as it can guarantee some of the invariants of
+the model at compile time and avoid specific run-time bugs which are
+harder to do in object-oriented languages.
 
 The goal of this blogpost is to give an example of Agent Based
 Modelling in Haskell. It is heavily based on \citetitle{thaler} by
@@ -167,11 +167,7 @@ c| and returns a time-varying value denoted |MSF m b c|. The reader
 can safely ignore the |m| and the constraint |Monad m| on the left
 hand side of the |=>|.\improvement{Why are they there though?}
 
-These signals can be composed directly or by composing
-signal functions. FRP libaries generally use arrows to implement
-functionality rather than monads due to greater efficiency and
-modularity. Arrows are a superset of monads, hence have very similar
-uses but are more restrictive (see~\cite{HEUNEN2006219} for more on arrows vs monads).
+(see~\cite{HEUNEN2006219} for more on arrows vs monads).
 
 The central concept of arrowised FRP is the Signal Function (SF). The SF
 represents a process overtime which maps an input signal to an output
