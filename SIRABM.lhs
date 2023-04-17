@@ -156,8 +156,7 @@ rich to allow models of interest to be captured in such a framework.
 
 FRP successfully applied in many domains, such as robotics or user interfacing.\improvement{We could do with a few more examples with a bit more detail}
 
-As already hinted, the central abstraction in FRP is a signal, which
-is a value that varies over time: |Time -> value|. We need to be able
+ We need to be able
 to lift an ordinary function to be a time-varying function. This is
 done using the |arr| operator. Figure~\ref{fig-arrOperator} depicts a
 function |f| being lifted to be a time-varying process. We can look at
@@ -167,17 +166,17 @@ c| and returns a time-varying value denoted |MSF m b c|. The reader
 can safely ignore the |m| and the constraint |Monad m| on the left
 hand side of the |=>|.\improvement{Why are they there though?}
 
-(see~\cite{HEUNEN2006219} for more on arrows vs monads).
-
-The central concept of arrowised FRP is the Signal Function (SF). The SF
-represents a process overtime which maps an input signal to an output
-signal. Thus, signifying that SFs have an awareness of the passing of
-time through the timestep of the system\unsure[inline]{I don't know what you are trying to say here}. This concept of using
-time-varying functions as a method of handling agent-based models is
-essential due to their time-dependent nature (see more
-\href{https://www.cs.yale.edu/publications/techreports/tr1049.pdf}{here}.
-
-Futher reading on FRP concepts can be found \href{https://ivanperez.io/papers/2016-HaskellSymposium-Perez-Barenz-Nilsson-FRPRefactored-short.pdf}{here}.
+As already hinted, the central abstraction in FRP is a signal, which
+is a value that varies over time: |Time -> value|. We need to be able
+to manipulate such time-varying values: the Signal Function (SF) takes
+a signal (a time-varying value) as input and produces a signal as its
+output. This concept of using time-varying functions as a method of
+handling agent-based models is essential due to their time-dependent
+nature and was used at least as early as~\cite{Hudak1994AnEI}. Futher
+reading on FRP concepts can be found
+\href{https://ivanperez.io/papers/2016-HaskellSymposium-Perez-Barenz-Nilsson-FRPRefactored-short.pdf}{here}. A
+theoretical basis for some of the concepts can be found
+in~\cite{HEUNEN2006219}.
 
 \begin{figure}
 \[
