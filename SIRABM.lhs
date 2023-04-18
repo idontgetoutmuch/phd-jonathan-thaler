@@ -156,27 +156,34 @@ rich to allow models of interest to be captured in such a framework.
 
 FRP successfully applied in many domains, such as robotics or user interfacing.\improvement{We could do with a few more examples with a bit more detail}
 
- We need to be able
-to lift an ordinary function to be a time-varying function. This is
-done using the |arr| operator. Figure~\ref{fig-arrOperator} depicts a
-function |f| being lifted to be a time-varying process. We can look at
-the specification of |arr|: |arr :: Monad m => (b -> c) -> MSF m b c|
-which tells us that |arr| takes a function from |b| to |c|, |f :: b ->
-c| and returns a time-varying value denoted |MSF m b c|. The reader
-can safely ignore the |m| and the constraint |Monad m| on the left
-hand side of the |=>|.\improvement{Why are they there though?}
-
 As already hinted, the central abstraction in FRP is a signal, which
 is a value that varies over time: |Time -> value|. We need to be able
 to manipulate such time-varying values: the Signal Function (SF) takes
 a signal (a time-varying value) as input and produces a signal as its
 output. This concept of using time-varying functions as a method of
 handling agent-based models is essential due to their time-dependent
-nature and was used at least as early as~\cite{Hudak1994AnEI}. Futher
+nature and was used at least as early as~\citedate{Hudak1994AnEI}~\cite{Hudak1994AnEI}. Futher
 reading on FRP concepts can be found
 \href{https://ivanperez.io/papers/2016-HaskellSymposium-Perez-Barenz-Nilsson-FRPRefactored-short.pdf}{here}. A
 theoretical basis for some of the concepts can be found
 in~\cite{HEUNEN2006219}.
+
+\subsubsection{Some Base Combinators}
+
+We need to be able to lift an ordinary function to be a function which
+operates on time-varying functions. This is done using the |arr|
+operator. Figure~\ref{fig-arrOperator} depicts a function |f| being
+lifted to be a (monadic) stream function. We can look at the
+specification of |arr|: |arr :: Monad m => (b -> c) -> MSF m b c|
+which tells us that |arr| takes a function from |b| to |c|, |f :: b ->
+c| and returns a signal function denoted |MSF m b c| which takes a
+time-varying process |Time -> b| as its input and produces a
+time-varying process |Time -> c| as its output. The reader can safely
+ignore the |m| and the constraint |Monad m| on the left hand side of
+the |=>|. As an aside, we note if we want pure stream functions, we
+can instantiate the monad to be the identity monad. The reader not
+familiar with monads can ignore both the constraint and the preceeding
+aside.
 
 \begin{figure}
 \[
@@ -186,7 +193,11 @@ in~\cite{HEUNEN2006219}.
 \label{fig-arrOperator}
 \end{figure}
 
-These time-varying process can be composed together using the |>>>| operator: |(>>>) :: Monad m => MSF m a b -> MSF m b c -> MSF m a c|. This is an infix function which takes two time-varying process and creates a new one that takes the output from the first process and makes it the iput of the second process.
+Stream functions can be composed together using the |>>>| operator:
+|(>>>) :: Monad m => MSF m a b -> MSF m b c -> MSF m a c|. This is an
+infix function which takes two stream functions and creates a new one
+that takes the output from the first and makes it the input of the
+second process.
 
 \begin{figure}
 \[
