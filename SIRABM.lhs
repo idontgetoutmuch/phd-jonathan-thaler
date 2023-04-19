@@ -217,12 +217,11 @@ velocity then integrate the velocity and add the starting velocity.
 type Pos = Double
 type Vel = Double
 
-fallingBall1 :: MonadState Int m => Pos -> Vel -> SF m () (Pos, Vel)
+fallingBall1 :: Monad m => Pos -> Vel -> SF m () (Pos, Vel)
 fallingBall1 p0 v0 = proc () -> do
   let g = -9.81
   v <- arr (\x -> v0 + x) <<< integral -< g
   p <- arr (\y -> p0 + y) <<< integral -< v
-  arrM_ (lift (modify (+1))) -< ()
   returnA -< (p,v)
 \end{code}
 
@@ -240,37 +239,21 @@ Figure~\ref{fig:fallingBall} shows the execution of such a process.
 
 main3 :: IO ()
 main3 = do
-  withArgs ["-odiagrams/fallingBall.png"] (r2AxisMain (jSaxis (fallingBall1 10 10)))
-  withArgs ["-odiagrams/bouncingBall.png"] (r2AxisMain (jSaxis (bouncingBall 10 10)))
-
-addPoint :: (Plotable (Diagram B) b, MonadState (Axis b V2 Double) m) =>
-            Double -> (Double, Double) -> m ()
-addPoint o (x, y) = addPlotable'
-                    ((circle 1e0 :: Diagram B) #
-                     fc brown #
-                     opacity o #
-                     translate (r2 (x, y)))
+  withArgs ["-odiagrams/fallingBall.png"] (r2AxisMain (jSaxis (fallingBall 200 40)))
+  withArgs ["-odiagrams/bouncingBall.png"] (r2AxisMain (jSaxis (bouncingBall 100 10)))
 
 jSaxis :: SF (StateT Int (WriterT [(Double, Double)] Identity)) () (Double, Double)
        -> Axis B V2 Double
 jSaxis msf = r2Axis &~ do
   let preMorePts = runMSFDet' 0 msf
-  let morePts = map p2 $ preMorePts
-  let l = length preMorePts
-  let os = [0.05,0.1..]
-  let ps = take (l `div` 4) [0,4..]
-  zipWithM_ addPoint os (map (preMorePts!!) ps)
-  linePlot' $ map unp2 $ take 200 morePts
+  let ts = map (* 0.1) [0, 1 ..]
+  linePlot' $ zip ts (map fst preMorePts) -- map unp2 $ take 200 morePts
 
-arrM_ :: Monad m => m b -> MSF m a b
-arrM_ = arrM . const
-
-fallingBall :: MonadState Int m => Pos -> Vel -> SF m () (Pos, Vel)
+fallingBall :: Monad m => Pos -> Vel -> SF m () (Pos, Vel)
 fallingBall p0 v0 = proc () -> do
   let g = -9.81
   v <- arr (\x -> v0 + x) <<< integral -< g
   p <- arr (\y -> p0 + y) <<< integralLinear v0 -< v
-  arrM_ (lift (modify (+1))) -< ()
   returnA -< (p,v)
 
 integralLinear :: Monad m => Double -> SF m Double Double
