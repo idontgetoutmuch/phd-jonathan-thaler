@@ -42,6 +42,7 @@
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main (main, main1, main2, main3, decodeCSV, runSimulationUntil, moore, neumann) where
 
@@ -209,14 +210,35 @@ second process.
 
 An example should clarify how such combinators can be used to describe an agent. A falling ball is an object which falls under gravity starting parameterised by a starting position and velocity. This time-varying process takes no input (the only value of type |()| is |()|) and produces a signal (a time-varying value) of the ball's position and velocity.
 
+We need one more combinator before we can create our example: |first
+:: Monad m => SF m a b -> SF m (a, c) (b, c)| which takes a stream
+function from |a| to |b| and creates a new function applies the
+original stream function to first element of a pair and leaves the
+second element of the pair unchanged.
+
 We can read the code below as take the accelaration (here
-gravitational constant $g$), integrate it and add the starting
-velocity then integrate the velocity and add the starting velocity.
+gravitational constant |g|), integrate it and add the starting
+velocity then duplicate this value and then take the first value of
+this pair and integrate the velocity and add the starting velocity.
 
 \begin{code}
 type Pos = Double
 type Vel = Double
 
+fallingBall' :: Monad m => Pos -> Vel -> SF m () (Pos, Vel)
+fallingBall' p0 v0 = arr (const (-9.81)) >>>
+                     integral >>>
+                     arr (\x -> v0 + x) >>>
+                     arr (\x -> (x, x)) >>>
+                     first integral >>>
+                     first (arr (\y -> p0 + y))
+\end{code}
+
+It becomes cumbersome to read code written in this style and a special
+notation exists, the arrow notation, to make code manipulating stream
+functions easier to read:
+
+\begin{code}
 fallingBall1 :: Monad m => Pos -> Vel -> SF m () (Pos, Vel)
 fallingBall1 p0 v0 = proc () -> do
   let g = -9.81
@@ -325,7 +347,7 @@ In the event (pun intended) of |NoEvent|, |switch| returns the first time-varyin
 Let us modify our example of a falling object to create a bouncing ball.
 
 \begin{code}
-bouncingBall :: MonadState Int m => Double -> Double -> SF m () (Double, Double)
+bouncingBall :: Monad m => Double -> Double -> SF m () (Double, Double)
 bouncingBall p0 v0 =
   switch (fallingBall p0 v0 >>> (arr id &&& hitFloor))
          (\(p,v) -> bouncingBall p (-v))
