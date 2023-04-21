@@ -44,11 +44,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Main (main, main1, main2, main3, decodeCSV, runSimulationUntil, moore, neumann) where
+module Main (main, main1, main2, main3, runSimulationUntil, moore, neumann) where
 
 import           Data.IORef
 import           System.IO
-import           Text.Printf
 
 import           Control.Monad.Random
 import           Control.Monad.Reader
@@ -60,40 +59,20 @@ import           FRP.BearRiver
 import qualified Graphics.Gloss as GLO
 import qualified Graphics.Gloss.Interface.IO.Animate as GLOAnim
 import           Data.MonadicStreamFunction.InternalCore
-import           Data.List (unfoldr)
 import           Graphics.Gloss.Export
 
-import qualified Data.ByteString.Lazy as LBS
-import qualified Data.Csv             as Csv
 import Plots.Axis  (Axis, r2Axis)
 
 import Diagrams.Backend.Cairo (B)
 import IHaskell.Display.Diagrams ()
-import Plots (scatterPlot, key, r2AxisMain, Plotable, addPlotable', linePlot')
-import Diagrams.Prelude hiding (Time, (^/), (^+^), trace, coords)
+import Plots (r2AxisMain, linePlot')
+import Diagrams.Prelude hiding (Time, (^/), (^+^), trace, coords, (*^))
 import System.Environment
-
-import qualified Data.ByteString.Lazy as BL
-import Data.Csv
-import qualified Data.Vector as V
 
 import Control.Monad.State
 
-import Debug.Trace
+import SIRHelpers
 
-winSize :: (Int, Int)
-winSize = (800, 800)
-
-cx, cy, wx, wy :: Int
-(cx, cy)   = agentGridSize
-(wx, wy)   = winSize
-
-cellWidth, cellHeight :: Double
-cellWidth  = (fromIntegral wx / fromIntegral cx)
-cellHeight = (fromIntegral wy / fromIntegral cy)
-
-winTitle :: String
-winTitle = "Agent-Based SIR on 2D Grid"
 \end{code}
 %endif
 
@@ -269,19 +248,42 @@ jSaxis :: SF (StateT Int (WriterT [(Double, Double)] Identity)) () (Double, Doub
 jSaxis msf = r2Axis &~ do
   let preMorePts = runMSFDet' 0 msf
   let ts = map (* 0.1) [0, 1 ..]
-  linePlot' $ zip ts (map fst preMorePts) -- map unp2 $ take 200 morePts
+  linePlot' $ take 400 $ zip ts (map fst preMorePts) -- map unp2 $ take 200 morePts
 
 fallingBall :: Monad m => Pos -> Vel -> SF m () (Pos, Vel)
 fallingBall p0 v0 = proc () -> do
   let g = -9.81
   v <- arr (\x -> v0 + x) <<< integral -< g
-  p <- arr (\y -> p0 + y) <<< integralLinear v0 -< v
+  p <- arr (\y -> p0 + y) <<< integralTrap -< v
   returnA -< (p,v)
+
+integralTrap :: (Monad m, VectorSpace a s) => SF m a a
+integralTrap = integralTrapFrom zeroVector
+
+integralTrapFrom :: (Monad m, VectorSpace a s) => a -> SF m a a
+integralTrapFrom a0 =
+  zeroVector --> proc a -> do
+    dt <- constM ask -< ()
+    aPrev <- iPre zeroVector -< a
+    accumulateWith (^+^) a0 -< (realToFrac dt / 2) *^ (a ^+^ aPrev)
 
 integralLinear :: Monad m => Double -> SF m Double Double
 integralLinear initial = average >>> integral
   where
     average = (arr id &&& iPre initial) >>^ (\(x, y) -> (x ^+^ y) ^/ 2)
+
+-- integral' :: (Fractional s, VectorSpace a s) => SF a a
+-- integral' = SF {sfTF = tf0}
+--   where
+--     tf0 a0 = (integralAux igrl0 a0, igrl0)
+
+--     igrl0  = zeroVector
+
+--     integralAux igrl a_prev = SF' tf -- True
+--       where
+--         tf dt a = (integralAux igrl' a, igrl')
+--           where
+--             igrl' = igrl ^+^ realToFrac dt *^ a_prev
 
 runMSFDet' :: Int ->
               SF (StateT Int (WriterT [(Double, Double)] Identity)) () (Double, Double) ->
@@ -399,7 +401,7 @@ complier automatically generates instances of the Eq and Show classes
 for the ADT.
 
 \begin{code}
-data SIRState = Susceptible | Infected | Recovered deriving (Show, Eq)
+-- data SIRState = Susceptible | Infected | Recovered deriving (Show, Eq)
 \end{code}
 
 \subsection{Define 2D environment}
@@ -420,7 +422,7 @@ numerical methods but if the dimensions were significantly higher then
 ABMs start to show their advantage.
 
 \begin{code}
-type Disc2dCoord  = (Int, Int)
+type Grid  = (Int, Int)
 \end{code}
 
 \subsection{Define types to store agent's environment}
@@ -430,7 +432,7 @@ retrievable. Hence, the type `SIREnv` is defined to allow agents to
 store their location coordinate and their state in an array.\unsure[inline]{I think there must be an assumption that every position contains an agent and this agent is either Susceptible, Infected or Recovered. Do you agree? And if so, can we make this explicit?}
 
 \begin{code}
-type SIREnv = Array Disc2dCoord SIRState
+type SIREnv = Array Grid SIRState
 \end{code}
 
 \subsection{Define the SIR Agent}
@@ -450,7 +452,6 @@ This is useful in instances where states of neighbours must be accessed
 by an agent to determine whether infection occurs.
 
 \begin{code}
-type SimSF g = SF (Rand g) () SIREnv
 \end{code}
 
 \subsection{Defining simulation context}
@@ -459,7 +460,6 @@ A simulation context data struct which contains the various parameters
 (e.g. simulation time) is defined in terms of their type. The \textit{!} is used
 to specific it is a strictness declaration.\change[inline]{I probably should have said this earlier but the reason for using strictness annotations is to avoid space leaks - I can explain this when we meet}
 
-\begin{code}
 data SimCtx g = SimCtx
   { simSf    :: !(SimSF g)
   , simEnv   :: !SIREnv
@@ -467,7 +467,6 @@ data SimCtx g = SimCtx
   , simSteps :: !Integer
   , simTime  :: !Time
   }
-\end{code}
 
 \subsection{Simulation Rules}
 
@@ -569,7 +568,7 @@ drawRandomElemS = proc as -> do
 }
 
 \begin{code}
-susceptible :: Disc2dCoord -> ABMSF SIREnv (SIRState, Event ())
+susceptible :: Grid -> ABMSF SIREnv (SIRState, Event ())
 susceptible coord = proc env -> do
   makeContact <- occasionally (1 / contactRate) () -< ()
   if not (isEvent makeContact)
@@ -591,7 +590,7 @@ transition from Susceptible to Recovered in one time step, not
 something we want to have in our model.
 
 \begin{code}
-susceptibleAgent :: Disc2dCoord -> ABMSF SIREnv SIRState
+susceptibleAgent :: Grid -> ABMSF SIREnv SIRState
 susceptibleAgent coord
     = switch
       (susceptible coord >>> iPre (Susceptible, NoEvent))
@@ -659,9 +658,6 @@ infectivity = 0.10
 
 illnessDuration :: Double
 illnessDuration = 15.0
-
-agentGridSize :: (Int, Int)
-agentGridSize = (27, 28)
 \end{code}
 
 Defining helper functions for the simulation
@@ -676,49 +672,12 @@ Functions related to the simulation context
 and update the simulation context respectively.
 
 \begin{code}
-mkSimCtx :: RandomGen g
-         => SimSF g
-         -> SIREnv
-         -> g
-         -> Integer
-         -> Time
-         -> SimCtx g
--- creating the specific SimCtx data struct to return
-mkSimCtx sf env g steps t = SimCtx {
-    simSf    = sf
-  , simEnv   = env
-  , simRng   = g
-  , simSteps = steps
-  , simTime  = t
-  }
-
-runStepCtx :: RandomGen g
-           => DTime
-           -> SimCtx g
-           -> SimCtx g
-runStepCtx dt ctx = ctx'
-  where
-    g   = simRng ctx
-    sf  = simSf ctx
-
-    sfReader            = unMSF sf ()
-    sfRand              = runReaderT sfReader dt
-    ((env, simSf'), g') = runRand sfRand g
-
-    steps = simSteps ctx + 1
-    t     = simTime ctx + dt
-    ctx'  = mkSimCtx simSf' env g' steps t
 \end{code}
 
 `evaluateCtxs` takes the initial context and creates a list of new
 contexts by running the simulation step.
 
 \begin{code}
-evaluateCtxs :: RandomGen g => Int -> DTime -> SimCtx g -> [SimCtx g]
-evaluateCtxs n dt initCtx = unfoldr g (initCtx, n)
-  where
-    g (c, m) | m < 0 = Nothing
-                   | otherwise = Just (c, (runStepCtx dt c, m - 1))
 \end{code}
 
 Functions related to Boundary Conditions
@@ -732,31 +691,31 @@ The following code is related to enforcing these BC:
 
 \begin{code}
 -- Neumann BC
-neumann :: [Disc2dCoord]
+neumann :: [Grid]
 neumann = [ topDelta, leftDelta, rightDelta, bottomDelta ]
 
 -- Moore BC
-moore :: [Disc2dCoord]
+moore :: [Grid]
 moore = [ topLeftDelta,    topDelta,     topRightDelta,
           leftDelta,                     rightDelta,
           bottomLeftDelta, bottomDelta,  bottomRightDelta ]
 
 -- different Delta values for the BC
-topLeftDelta :: Disc2dCoord
+topLeftDelta :: Grid
 topLeftDelta      = (-1, -1)
-topDelta :: Disc2dCoord
+topDelta :: Grid
 topDelta          = ( 0, -1)
-topRightDelta :: Disc2dCoord
+topRightDelta :: Grid
 topRightDelta     = ( 1, -1)
-leftDelta :: Disc2dCoord
+leftDelta :: Grid
 leftDelta         = (-1,  0)
-rightDelta :: Disc2dCoord
+rightDelta :: Grid
 rightDelta        = ( 1,  0)
-bottomLeftDelta :: Disc2dCoord
+bottomLeftDelta :: Grid
 bottomLeftDelta   = (-1,  1)
-bottomDelta :: Disc2dCoord
+bottomDelta :: Grid
 bottomDelta       = ( 0,  1)
-bottomRightDelta :: Disc2dCoord
+bottomRightDelta :: Grid
 bottomRightDelta  = ( 1,  1)
 \end{code}
 
@@ -768,7 +727,7 @@ functions below.
 `initAgentsEnv` initialises the simulation environment.
 
 \begin{code}
-initAgentsEnv :: (Int, Int) -> ([(Disc2dCoord, SIRState)], SIREnv)
+initAgentsEnv :: (Int, Int) -> ([(Grid, SIRState)], SIREnv)
 initAgentsEnv (xd, yd) = (as, e)
   where
     xCenter = floor $ fromIntegral xd * (0.5 :: Double)
@@ -793,9 +752,9 @@ all neighbours or agents.
 
 \begin{code}
 neighbours :: SIREnv
-           -> Disc2dCoord
-           -> Disc2dCoord
-           -> Maybe [Disc2dCoord]
+           -> Grid
+           -> Grid
+           -> Maybe [Grid]
            -> [SIRState]
 neighbours e _ _ Nothing = elems e
 neighbours e (x, y) (dx, dy) (Just n) = map (e !) nCoords'
@@ -814,7 +773,7 @@ infected and recovered agents do not require this information.
  -- recovered agent ignores gen bc they stay immune
 
 \begin{code}
-sirAgent :: Disc2dCoord -> SIRState -> SF (Rand StdGen) SIREnv SIRState
+sirAgent :: Grid -> SIRState -> SF (Rand StdGen) SIREnv SIRState
 sirAgent coord Susceptible = susceptibleAgent coord
 sirAgent _     Infected    = infectedAgent
 sirAgent _     Recovered   = recoveredAgent
@@ -838,7 +797,7 @@ by the associations in the right argument.
 
 \begin{code}
 simulationStep :: RandomGen g
-               => [(SIRAgent g, Disc2dCoord)]
+               => [(SIRAgent g, Grid)]
                -> SIREnv
                -> SF (Rand g) () SIREnv
 simulationStep sfsCoords env = MSF $ \_ -> do
@@ -858,12 +817,6 @@ and recovered agents within the simulation. This function is used both
 for the animation and the plot.
 
 \begin{code}
-aggregateStates :: [SIRState] -> (Int, Int, Int)
-aggregateStates as = (susceptibleCount, infectedCount, recoveredCount)
-  where
-    susceptibleCount = length $ filter (Susceptible==) as
-    infectedCount    = length $ filter (Infected==) as
-    recoveredCount   = length $ filter (Recovered==) as
 \end{code}
 
 Functions for generating CSV file
@@ -872,43 +825,12 @@ Functions for generating CSV file
 R states into the CSV file.
 
 \begin{code}
-appendLine :: Csv.ToRecord a => Handle -> a -> IO ()
-appendLine hndl line = LBS.hPut hndl (Csv.encode [Csv.toRecord line])
 \end{code}
 
 `writeSimulationUntil` uses the above auxilliary functions to generate
 the overall CSV file
 
 \begin{code}
-writeSimulationUntil :: RandomGen g
-                     => Time
-                     -> DTime
-                     -> SimCtx g
-                     -> String
-                     -> IO ()
-writeSimulationUntil tMax dt ctx0 fileName = do
-    fileHdl <- openFile fileName WriteMode
-    appendLine fileHdl ("Susceptible", "Infected", "Recovered")
-    writeSimulationUntilAux 0 ctx0 fileHdl
-    hClose fileHdl
-  where
-    writeSimulationUntilAux :: RandomGen g
-                            => Time
-                            -> SimCtx g
-                            -> Handle
-                            -> IO ()
-    writeSimulationUntilAux t ctx fileHdl
-        | t >= tMax = return ()
-        | otherwise = do
-          let env  = simEnv ctx
-              aggr = aggregateStates $ elems env
-
-              t'   = t + dt
-              ctx' = runStepCtx dt ctx
-
-          appendLine fileHdl aggr
-
-          writeSimulationUntilAux t' ctx' fileHdl
 \end{code}
 
 Functions for generating the animation
@@ -916,92 +838,12 @@ Functions for generating the animation
 `visualiseSimulation` generates and updates the animation.
 
 \begin{code}
-visualiseSimulation :: RandomGen g
-                    => DTime
-                    -> SimCtx g
-                    -> IO ()
-visualiseSimulation dt ctx0 = do
-    ctxRef <- newIORef ctx0
-
-    GLOAnim.animateIO
-
-      (GLO.InWindow winTitle winSize (0, 0))
-      GLO.white
-      (nextFrame ctxRef)
-      (const $ return ())
-
-  where
-    -- (cx, cy)   = agentGridSize
-    -- (wx, wy)   = winSize
-    -- cellWidth  = (fromIntegral wx / fromIntegral cx) :: Double
-    -- cellHeight = (fromIntegral wy / fromIntegral cy) :: Double
-
-    nextFrame :: RandomGen g
-              => IORef (SimCtx g)
-              -> Float
-              -> IO GLO.Picture
-    nextFrame ctxRef _ = do
-      ctx <- readIORef ctxRef
-
-      let ctx' = runStepCtx dt ctx
-      writeIORef ctxRef ctx'
-
-      return $ ctxToPic ctx
-
-ctxToPic :: RandomGen g
-             => SimCtx g
-             -> GLO.Picture
-ctxToPic ctx = GLO.Pictures $ aps ++ [timeStepTxt]
-      where
-          env = simEnv ctx
-          as  = assocs env
-          aps = map renderAgent as
-          t   = simTime ctx
-
-          (tcx, tcy)  = transformToWindow (-7, 10)
-          timeTxt     = printf "%0.1f" t
-          timeStepTxt = GLO.color GLO.black $ GLO.translate tcx tcy $
-                        GLO.scale 0.5 0.5 $ GLO.Text timeTxt
-
-renderAgent :: (Disc2dCoord, SIRState) -> GLO.Picture
-renderAgent (coord, Susceptible)
-    = GLO.color (GLO.makeColor 0.0 0.0 0.7 1.0) $
-      GLO.translate x y $ GLO.Circle (realToFrac cellWidth / 2)
-  where
-    (x, y) = transformToWindow coord
-renderAgent (coord, Infected)
-    = GLO.color (GLO.makeColor 0.7 0.0 0.0 1.0) $
-      GLO.translate x y $
-      GLO.ThickCircle 0 (realToFrac cellWidth)
-  where
-    (x, y) = transformToWindow coord
-renderAgent (coord, Recovered)
-    = GLO.color (GLO.makeColor 0.0 0.70 0.0 1.0) $
-      GLO.translate x y $
-      GLO.ThickCircle 0 (realToFrac cellWidth)
-  where
-    (x, y) = transformToWindow coord
-
-transformToWindow :: Disc2dCoord -> (Float, Float)
-transformToWindow (x, y) = (x', y')
-      where
-        rw = cellWidth
-        rh = cellHeight
-
-        halfXSize = fromRational (toRational wx / 2.0)
-        halfYSize = fromRational (toRational wy / 2.0)
-
-        x' = fromRational (toRational (fromIntegral x * rw)) - halfXSize
-        y' = fromRational (toRational (fromIntegral y * rh)) - halfYSize
 \end{code}
 
 `animation` is used to map a list of contexts to time - which is
 required for the function that produces the gif.
 
 \begin{code}
-animation :: RandomGen g => [SimCtx g] -> DTime -> Time -> SimCtx g
--- bc of the gif time to pictures conversion. Lists of context -> time to context
-animation ctxs dt t = ctxs !! floor (t / dt)
 \end{code}
 
 Functions for running simulation
@@ -1010,29 +852,6 @@ Functions for running simulation
 duration.
 
 \begin{code}
-runSimulationUntil :: RandomGen g
-                   => Time
-                   -> DTime
-                   -> SimCtx g
-                   -> [(Int, Int, Int)]
--- With the max time, time step and initial context, run simulation via the Aux function
-runSimulationUntil tMax dt ctx0 = runSimulationAux 0 ctx0 []
-  where
-    runSimulationAux :: RandomGen g
-                      => Time
-                      -> SimCtx g
-                      -> [(Int, Int, Int)]
-                      -> [(Int, Int, Int)]
-    runSimulationAux t ctx acc
-        | t >= tMax = acc -- if time step is greater than tmax,
-        | otherwise = runSimulationAux t' ctx' acc'
-      where
-        env  = simEnv ctx --
-        aggr = aggregateStates $ elems env
-
-        t'   = t + dt -- increase time by timestep
-        ctx' = runStepCtx dt ctx -- get new step context
-        acc' = aggr : acc
 \end{code}
 
 Main Function
@@ -1072,35 +891,6 @@ Chart to be finalised. Further details on the results to be added after
 this.
 
 \begin{code}
-decodeCSV :: BL.ByteString -> Either String (V.Vector (Int, Int, Int))
-decodeCSV  = decode NoHeader
-
-getResults :: IO ([(Int, Int)], [(Int, Int)], [(Int, Int)])
-getResults = do
-    csvData <- BL.readFile "SIR_DUNAI_dt001.csv"
-    case decode HasHeader csvData of
-        Left err -> error err
-        Right y -> do let (a,b,c) = addToList y
-                      let d = zip [1..length a] a --data that I want to use for plotting (trace 1 - S)
-                      let e = zip [1..length b] b --data for plotting (line 2)
-                      let f = zip [1..length c] c --data for plotting (line 3)
-                      pure (d, e, f)
-
-addToList :: V.Vector (Int, Int, Int) -> ([Int], [Int], [Int])
-addToList v = unzip3 (V.toList v)
-
--- (d,e,f) <- getResults
-
-scatterAxis2 :: ([(Int, Int)], [(Int, Int)], [(Int, Int)]) -> Axis B V2 Double
-scatterAxis2 (d, e, f) = r2Axis &~ do
-    scatterPlot (map (\(x,y) -> (fromIntegral x, fromIntegral y)) d) $ key "S"
-    scatterPlot (map (\(x,y) -> (fromIntegral x, fromIntegral y)) e) $ key "I"
-    scatterPlot (map (\(x,y) -> (fromIntegral x, fromIntegral y)) f) $ key "R"
-
-main1 :: IO ()
-main1 = do
-  (d,e,f) <- getResults
-  withArgs ["-odiagrams/BoardingSchool78.png"] (r2AxisMain $ scatterAxis2 (d, e, f))
 \end{code}
 
 ![svg](output\_82\_0.svg)
